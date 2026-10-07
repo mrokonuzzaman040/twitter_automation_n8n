@@ -12,9 +12,14 @@ from zoneinfo import ZoneInfo
 
 from . import config, crypto
 
+USE_PG = bool(config.DATABASE_URL)
+if USE_PG:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+
 SECRET_SETTINGS = {"llm_api_key", "google_service_account_json"}
 ACCOUNT_FIELDS = ["platform", "handle", "topic", "tone", "language", "post_times", "timezone",
-                  "cycle_hours", "post_mode", "schedule_sheet_id", "target_profiles"]
+                  "cycle_hours", "schedule_sheet_id", "target_profiles"]
 PLATFORMS = ("twitter", "instagram")
 CREDENTIAL_FIELDS = {
     "twitter": ["api_key", "api_secret", "access_token", "access_token_secret"],
@@ -50,6 +55,44 @@ CREATE TABLE IF NOT EXISTS accounts (
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER,
+    ts TEXT NOT NULL,
+    level TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    message TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS events_account ON events(account_id, id);
+"""
+
+CONTROL_SCHEMA_PG = """
+CREATE TABLE IF NOT EXISTS accounts (
+    id SERIAL PRIMARY KEY,
+    platform TEXT NOT NULL,
+    handle TEXT NOT NULL,
+    topic TEXT NOT NULL DEFAULT '',
+    tone TEXT NOT NULL DEFAULT '',
+    language TEXT NOT NULL DEFAULT 'English',
+    post_times TEXT NOT NULL DEFAULT '09:00,13:00,18:00',
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    cycle_hours INTEGER NOT NULL DEFAULT 24,
+    post_mode TEXT NOT NULL DEFAULT 'approval',
+    schedule_sheet_id TEXT NOT NULL DEFAULT '',
+    target_profiles TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT 'panel',
+    desired_state TEXT NOT NULL DEFAULT 'stopped',
+    agent_status TEXT NOT NULL DEFAULT 'stopped',
+    current_task TEXT NOT NULL DEFAULT '',
+    last_error TEXT NOT NULL DEFAULT '',
+    last_cycle_at TEXT,
+    next_cycle_at TEXT,
+    heartbeat_at TEXT,
+    run_now INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS events (
+    id SERIAL PRIMARY KEY,
     account_id INTEGER,
     ts TEXT NOT NULL,
     level TEXT NOT NULL,
@@ -146,7 +189,52 @@ def _conn(path, schema, migrations=()):
         c.close()
 
 
+@contextmanager
+def _pg_conn(schema, migrations=()):
+    raw = psycopg2.connect(config.DATABASE_URL)
+    raw.cursor_factory = RealDictCursor
+
+    class Wrapper:
+        def __init__(self, conn):
+            self.conn = conn
+        def execute(self, sql, args=()):
+            sql2 = sql.replace('?', '%s')
+            cur = self.conn.cursor()
+            cur.execute(sql2, args)
+            return cur
+        def commit(self):
+            self.conn.commit()
+        def close(self):
+            self.conn.close()
+        def cursor(self):
+            return self.conn.cursor()
+
+    c = Wrapper(raw)
+    try:
+        if "pg_control" not in _initialised:
+            with _init_lock:
+                if "pg_control" not in _initialised:
+                    cur = raw.cursor()
+                    for stmt in schema.strip().split(";"):
+                        stmt = stmt.strip()
+                        if stmt:
+                            cur.execute(stmt)
+                    for sql in migrations:
+                        try:
+                            cur.execute(sql)
+                        except Exception:
+                            pass
+                    raw.commit()
+                    _initialised.add("pg_control")
+        yield c
+        c.commit()
+    finally:
+        c.close()
+
+
 def control():
+    if USE_PG:
+        return _pg_conn(CONTROL_SCHEMA_PG, CONTROL_MIGRATIONS)
     return _conn(config.DATA_DIR / "control.db", CONTROL_SCHEMA, CONTROL_MIGRATIONS)
 
 
@@ -158,12 +246,17 @@ def account(account_id: int):
     return _conn(account_path(account_id), ACCOUNT_SCHEMA)
 
 
+def _adapt_sql(sql):
+    return sql.replace('?', '%s') if USE_PG else sql
+
 def rows(c, sql, *args):
-    return [dict(r) for r in c.execute(sql, args).fetchall()]
+    sql2 = _adapt_sql(sql)
+    return [dict(r) for r in c.execute(sql2, args).fetchall()]
 
 
 def one(c, sql, *args):
-    r = c.execute(sql, args).fetchone()
+    sql2 = _adapt_sql(sql)
+    r = c.execute(sql2, args).fetchone()
     return dict(r) if r else None
 
 
@@ -220,10 +313,6 @@ def normalize_account(data: dict, partial: bool = False) -> dict:
             out["cycle_hours"] = max(1, min(168, int(float(out["cycle_hours"]))))
         except ValueError:
             raise ValueError("cycle_hours must be a number")
-    if "post_mode" in out:
-        out["post_mode"] = out["post_mode"].lower()
-        if out["post_mode"] not in ("approval", "auto"):
-            raise ValueError("post_mode must be approval or auto")
     return out
 
 
@@ -289,8 +378,16 @@ def create_account(data: dict, source: str = "panel", desired_state: str = "stop
     cols = list(data) + ["source", "desired_state", "created_at"]
     vals = list(data.values()) + [source, desired_state, now()]
     with control() as c:
-        cur = c.execute(f"INSERT INTO accounts({','.join(cols)}) VALUES({','.join('?' * len(cols))})", vals)
-        account_id = cur.lastrowid
+        if USE_PG:
+            sql = f"INSERT INTO accounts({','.join(cols)}) VALUES({','.join('%s' * len(cols))}) RETURNING id"
+        else:
+            sql = f"INSERT INTO accounts({','.join(cols)}) VALUES({','.join('?' * len(cols))})"
+        cur = c.execute(sql, vals)
+        if USE_PG:
+            row = cur.fetchone()
+            account_id = row['id'] if row else None
+        else:
+            account_id = cur.lastrowid
     with account(account_id):
         pass  # creates the per-account database
     return account_id

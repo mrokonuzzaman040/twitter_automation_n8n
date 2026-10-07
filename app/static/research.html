@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Social Agents - Research</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<div id="login" class="card hidden">
+  <h2>Social Agents</h2>
+  <form id="loginForm">
+    <label>Admin password</label>
+    <input type="password" id="password" autofocus>
+    <div class="actions"><button class="primary">Sign in</button></div>
+    <div id="loginErr" class="err small"></div>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="logo">S</div>
+        <span>Social Agents</span>
+      </div>
+      <nav>
+        <a href="/">Dashboard</a>
+        <a href="/approvals">Approvals <span id="pendingCount" class="badge hidden"></span></a>
+        <a href="/content">Content</a>
+        <a href="/research" class="active">Research</a>
+        <a href="/logs">Logs</a>
+        <a href="/settings">Settings</a>
+      </nav>
+      <div class="header-right">
+        <span id="masterBadge" class="badge">…</span>
+        <button id="logout">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Research</h1>
+        <p id="pageSub">What the research agent found on the last cycle</p>
+      </div>
+    </div>
+    <main>
+<div class="card row"><select id="researchAccount" style="width:auto"></select></div>
+<div id="researchBody"></div>
+    </main>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/static/common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+const CATEGORIES = { latest_news: 'Latest news', b2b_offers: 'Recent B2B offers', trending_topics: 'Trending topics',
+                     viral_posts: 'Viral posts', viral_content: 'Viral content',
+                     social_trending: 'Top posts on the platform', target_profiles: 'Target profiles' };
+
+async function loadResearch() {
+  const id = $('researchAccount').value; if (!id) { $('researchBody').innerHTML = ''; return; }
+  const r = await api(`/accounts/${id}/research`);
+  let html = '';
+  if (r.brief) {
+    html += `<div class="card"><h2>Brief · ${when(r.brief.created_at)}</h2><p>${esc(r.brief.brief.summary)}</p>
+      ${r.brief.brief.target_insights ? `<p><b>What works for target profiles:</b> ${esc(r.brief.brief.target_insights)}</p>` : ''}
+      <table><thead><tr><th>Category</th><th>Angle</th><th>Insight</th></tr></thead><tbody>` +
+      (r.brief.brief.angles || []).map(a => `<tr><td>${badge('', CATEGORIES[a.category] || a.category)}</td>
+        <td>${safeUrl(a.url) ? `<a href="${safeUrl(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title)}</a>` : esc(a.title)}</td>
+        <td>${esc(a.insight)}</td></tr>`).join('') + '</tbody></table></div>';
+    for (const [key, label] of Object.entries(CATEGORIES)) {
+      const items = r.items.filter(i => i.category === key);
+      html += `<div class="card"><h2>${label} <span class="muted">(${items.length})</span></h2>` +
+        (items.map(i => `<div style="margin-bottom:8px">${safeUrl(i.url) ? `<a href="${safeUrl(i.url)}" target="_blank" rel="noopener noreferrer">${esc(i.title)}</a>` : esc(i.title)}
+          <span class="small muted"> · ${esc(i.source)}${i.score ? ' · ' + i.score.toLocaleString() : ''}</span>
+          <div class="small muted">${esc(i.summary.slice(0, 220))}</div></div>`).join('') || '<span class="muted small">Nothing found this run.</span>') + '</div>';
+    }
+  } else html += '<div class="card muted">No research yet for this account.</div>';
+  html += `<div class="card"><h2>Recent cycles</h2><table><tbody>` + (r.runs.map(x =>
+    `<tr><td>#${x.id}</td><td>${when(x.started_at)}</td><td>${badge(x.status)}</td><td class="small err">${esc(x.error)}</td></tr>`).join('')
+    || '<tr><td class="muted">None</td></tr>') + '</tbody></table></div>';
+  $('researchBody').innerHTML = html;
+}
+
+$('researchAccount').onchange = loadResearch;
+
+// Load accounts on page load
+api('/overview').then(data => {
+  state.accounts = data.accounts;
+  const sel = $('researchAccount');
+  sel.innerHTML = state.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
+  if (state.accounts.length) loadResearch();
+}).catch(() => showLogin());
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Social Agents - Approvals</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<div id="login" class="card hidden">
+  <h2>Social Agents</h2>
+  <form id="loginForm">
+    <label>Admin password</label>
+    <input type="password" id="password" autofocus>
+    <div class="actions"><button class="primary">Sign in</button></div>
+    <div id="loginErr" class="err small"></div>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="logo">S</div>
+        <span>Social Agents</span>
+      </div>
+      <nav>
+        <a href="/">Dashboard</a>
+        <a href="/approvals" class="active">Approvals <span id="pendingCount" class="badge hidden"></span></a>
+        <a href="/content">Content</a>
+        <a href="/research">Research</a>
+        <a href="/logs">Logs</a>
+        <a href="/settings">Settings</a>
+      </nav>
+      <div class="header-right">
+        <span id="masterBadge" class="badge">…</span>
+        <button id="logout">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Approvals</h1>
+        <p id="pageSub">Drafts waiting for your decision, from every account</p>
+      </div>
+    </div>
+    <main>
+<div class="card row">
+  <span class="muted">Nothing is published until you approve it here or in Telegram. Posts you do not approve stay drafts.</span>
+  <div class="spacer"></div>
+  <button id="approveAllDrafts" class="primary">Approve all</button>
+</div>
+<div class="card tablewrap">
+  <table>
+    <thead><tr><th>Account</th><th>Media</th><th>Post</th><th>Scheduled</th><th></th></tr></thead>
+    <tbody id="draftRows"></tbody>
+  </table>
+</div>
+
+<dialog id="postDlg">
+  <h3>Edit post</h3>
+  <label>Text</label><textarea id="p_text"></textarea>
+  <label>Hashtags</label><input id="p_hashtags">
+  <label>Image URL</label><input id="p_image_url">
+  <label>Video URL</label><input id="p_video_url">
+  <label>Scheduled time (your local time)</label><input id="p_scheduled_at" type="datetime-local">
+  <div id="postErr" class="err small"></div>
+  <div class="actions"><button data-close>Cancel</button><button class="primary" id="savePost">Save</button></div>
+</dialog>
+    </main>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/static/common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+let drafts = [];
+
+function postRow(p, accountId, account) {
+  const b = (action, label, cls = '') => `<button class="${cls}" data-post="${p.id}" data-acc="${accountId}" data-action="${action}">${label}</button>`;
+  let acts = '';
+  if (p.status === 'draft') acts += b('approve', 'Approve', 'primary') + b('post_now', 'Approve + post now');
+  if (p.status === 'scheduled') acts += b('draft', 'Back to draft');
+  if (['failed', 'missed', 'rejected'].includes(p.status)) acts += b('post_now', 'Post now') + b('draft', 'Back to draft');
+  if (p.status !== 'posted') acts += b('edit', 'Edit');
+  if (p.status === 'draft') acts += b('reject', 'Discard', 'danger');
+  const img = safeUrl(p.image_url), link = (u, label) => safeUrl(u) ? `<div class="small"><a href="${safeUrl(u)}" target="_blank" rel="noopener noreferrer">${label}</a></div>` : '';
+  return `<tr>
+    ${account ? `<td class="nw"><b>@${esc(account.handle)}</b><div class="small muted">${esc(account.platform)}</div></td>` : ''}
+    <td>${img ? `<a href="${img}" target="_blank" rel="noopener noreferrer"><img class="thumb" src="${img}" loading="lazy" referrerpolicy="no-referrer"></a>` : '<span class="muted small">no image</span>'}
+        ${link(p.video_url, 'video')}${link(p.media_source_url, 'pin')}</td>
+    <td><div class="pre">${esc(p.text)}</div><div class="small muted">${esc(p.hashtags)}</div>
+        ${link(p.source_url, 'research source')}${p.error ? `<div class="small err">${esc(p.error)}</div>` : ''}</td>
+    <td class="small nw">${when(p.scheduled_at)}</td>
+    ${account ? '' : `<td>${badge(p.status, p.status === 'scheduled' ? 'approved' : '')}${link(p.posted_url, 'view')}</td>`}
+    <td><div class="row">${acts}</div></td></tr>`;
+}
+
+async function loadDrafts() {
+  drafts = await api('/drafts');
+  $('draftRows').innerHTML = drafts.map(p => postRow(p, p.account_id, p)).join('')
+    || '<tr><td colspan="5" class="muted">No drafts are waiting for approval.</td></tr>';
+}
+
+async function onPostClick(e, list) {
+  const { post, acc, action } = e.target.dataset; if (!post) return;
+  const p = list.find(x => x.id == post && (x.account_id ?? acc) == acc);
+  if (action === 'edit') {
+    state.post = { id: p.id, acc };
+    ['text', 'hashtags', 'image_url', 'video_url'].forEach(f => $('p_' + f).value = p[f]);
+    const d = new Date(p.scheduled_at);
+    $('p_scheduled_at').value = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    $('postErr').textContent = ''; $('postDlg').showModal(); return;
+  }
+  if (action === 'post_now' && !confirm('Publish this post to the account now?')) return;
+  try {
+    const r = await api(`/accounts/${acc}/posts/${post}`, 'PATCH', { action });
+    if (['approve', 'post_now'].includes(action))
+      toast(r.agent_running ? (action === 'approve' ? 'Approved - it will be posted at its scheduled time' : 'Approved - posting within 30 seconds')
+                            : 'Approved - but this account\'s agent is not running, so start it to publish');
+    loadDrafts();
+  } catch (err) { toast(err.message); }
+}
+
+$('draftRows').onclick = e => onPostClick(e, drafts);
+
+$('savePost').onclick = async () => {
+  const body = Object.fromEntries(['text', 'hashtags', 'image_url', 'video_url'].map(f => [f, $('p_' + f).value]));
+  if ($('p_scheduled_at').value) body.scheduled_at = new Date($('p_scheduled_at').value).toISOString();
+  try { await api(`/accounts/${state.post.acc}/posts/${state.post.id}`, 'PATCH', body); $('postDlg').close(); loadDrafts(); }
+  catch (err) { $('postErr').textContent = err.message; }
+};
+
+$('approveAllDrafts').onclick = async () => {
+  if (!drafts.length) return toast('Nothing is waiting');
+  if (!confirm(`Approve all ${drafts.length} drafts for publishing at their scheduled times?`)) return;
+  for (const p of drafts) await api(`/accounts/${p.account_id}/posts/${p.id}`, 'PATCH', { action: 'approve' });
+  loadDrafts();
+};
+
+loadDrafts();
+});
+</script>
+</body>
+</html>

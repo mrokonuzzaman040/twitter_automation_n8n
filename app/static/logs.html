@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Social Agents - Logs</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<div id="login" class="card hidden">
+  <h2>Social Agents</h2>
+  <form id="loginForm">
+    <label>Admin password</label>
+    <input type="password" id="password" autofocus>
+    <div class="actions"><button class="primary">Sign in</button></div>
+    <div id="loginErr" class="err small"></div>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="logo">S</div>
+        <span>Social Agents</span>
+      </div>
+      <nav>
+        <a href="/">Dashboard</a>
+        <a href="/approvals">Approvals <span id="pendingCount" class="badge hidden"></span></a>
+        <a href="/content">Content</a>
+        <a href="/research">Research</a>
+        <a href="/logs" class="active">Logs</a>
+        <a href="/settings">Settings</a>
+      </nav>
+      <div class="header-right">
+        <span id="masterBadge" class="badge">…</span>
+        <button id="logout">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Logs</h1>
+        <p id="pageSub">Activity from the master agent and every account agent</p>
+      </div>
+    </div>
+    <main>
+<div class="card row">
+  <select id="logAccount" style="width:auto"></select>
+  <button id="refreshLogs">Refresh</button>
+</div>
+<div class="card tablewrap">
+  <table><thead><tr><th>Time</th><th>Account</th><th>Agent</th><th>Message</th></tr></thead><tbody id="logRows"></tbody></table>
+</div>
+    </main>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/static/common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+async function loadLogs() {
+  const id = $('logAccount').value || 0;
+  const rows = await api(`/events?account_id=${id}`);
+  const name = e => e.handle ? '@' + e.handle : (state.accounts.find(a => a.id == e.account_id) || {}).handle || (e.account_id ? '#' + e.account_id : 'system');
+  $('logRows').innerHTML = rows.map(e => `<tr><td class="small muted" style="white-space:nowrap">${when(e.ts)}</td><td class="small">${esc(name(e))}</td>
+    <td>${badge(e.level === 'info' ? '' : e.level, e.agent)}</td><td class="pre">${esc(e.message)}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No events yet.</td></tr>';
+}
+
+$('logAccount').onchange = $('refreshLogs').onclick = loadLogs;
+
+// Load accounts on page load
+api('/overview').then(data => {
+  state.accounts = data.accounts;
+  const sel = $('logAccount');
+  sel.innerHTML = '<option value="0">All accounts</option>' + state.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
+  loadLogs();
+}).catch(() => showLogin());
+});
+</script>
+</body>
+</html>

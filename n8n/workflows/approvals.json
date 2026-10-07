@@ -1,0 +1,376 @@
+{
+  "id": "SocialAgentsAprv",
+  "name": "Social Agents - Telegram approvals",
+  "active": true,
+  "nodes": [
+    {
+      "id": "t1",
+      "name": "Every 10 seconds",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "t2",
+      "name": "Telegram set up?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $env.TELEGRAM_BOT_TOKEN && $env.TELEGRAM_CHAT_ID ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "t3",
+      "name": "Telegram: get button presses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.TELEGRAM_API_URL || 'https://api.telegram.org' }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/getUpdates?timeout=0&allowed_updates=%5B%22callback_query%22%5D",
+        "options": {}
+      }
+    },
+    {
+      "id": "t4",
+      "name": "Read button presses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// one item per button press; anything that is not one of our buttons is marked invalid\nconst out = [];\nfor (const u of $input.first().json.result || []) {\n  const q = u.callback_query;\n  const [action, account_id, post_id] = String(q && q.data || '').split(':');\n  out.push({ json: {\n    update_id: u.update_id,\n    valid: ['approve', 'post_now', 'draft'].includes(action) && !!account_id && !!post_id ? 'yes' : 'no',\n    action, account_id, post_id,\n    callback_id: q ? q.id : '',\n    chat_id: q && q.message ? String(q.message.chat.id) : '',\n    message_id: q && q.message ? q.message.message_id : null,\n  } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "t5",
+      "name": "From the admin chat?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        860,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.valid === 'yes' && $json.chat_id === String($env.TELEGRAM_CHAT_ID) ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "t6",
+      "name": "Panel: apply the decision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        200
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SOCIAL_AGENTS_URL }}/api/accounts/{{ $json.account_id }}/posts/{{ $json.post_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SOCIAL_AGENTS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: $json.action }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "t7",
+      "name": "Result text",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1300,
+        200
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "text",
+              "value": "={{ (() => { const r = $json; const p = $('Read button presses').item.json; if (!r.ok) return '⚠️ Post #' + p.post_id + ': ' + (r.detail || 'could not be updated'); const off = r.agent_running ? '' : ' (the agent for this account is not running - start it in the panel to publish)'; if (p.action === 'approve') return '✅ Post #' + p.post_id + ' approved. It will be published at its planned time' + off; if (p.action === 'post_now') return '🚀 Post #' + p.post_id + ' approved. Publishing now' + off; return '📝 Post #' + p.post_id + ' kept as draft. It will not be published'; })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "t8",
+      "name": "Telegram: remove the buttons",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1520,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TELEGRAM_API_URL || 'https://api.telegram.org' }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Read button presses').item.json.chat_id, message_id: $('Read button presses').item.json.message_id, reply_markup: { inline_keyboard: [] } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "t9",
+      "name": "Telegram: reply with the result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1740,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TELEGRAM_API_URL || 'https://api.telegram.org' }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Read button presses').item.json.chat_id, reply_to_message_id: $('Read button presses').item.json.message_id, text: $('Result text').item.json.text }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "t10",
+      "name": "Telegram: stop the button spinner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1960,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TELEGRAM_API_URL || 'https://api.telegram.org' }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/answerCallbackQuery",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ callback_query_id: $('Read button presses').item.json.callback_id }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "t11",
+      "name": "Telegram: mark presses as handled",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        860,
+        440
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.TELEGRAM_API_URL || 'https://api.telegram.org' }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/getUpdates?timeout=0&offset={{ Math.max(...$input.all().map(i => i.json.update_id)) + 1 }}",
+        "options": {}
+      },
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Every 10 seconds": {
+      "main": [
+        [
+          {
+            "node": "Telegram set up?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram set up?": {
+      "main": [
+        [
+          {
+            "node": "Telegram: get button presses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: get button presses": {
+      "main": [
+        [
+          {
+            "node": "Read button presses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read button presses": {
+      "main": [
+        [
+          {
+            "node": "From the admin chat?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram: mark presses as handled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "From the admin chat?": {
+      "main": [
+        [
+          {
+            "node": "Panel: apply the decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Panel: apply the decision": {
+      "main": [
+        [
+          {
+            "node": "Result text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Result text": {
+      "main": [
+        [
+          {
+            "node": "Telegram: remove the buttons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: remove the buttons": {
+      "main": [
+        [
+          {
+            "node": "Telegram: reply with the result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: reply with the result": {
+      "main": [
+        [
+          {
+            "node": "Telegram: stop the button spinner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none"
+  },
+  "pinData": {}
+}

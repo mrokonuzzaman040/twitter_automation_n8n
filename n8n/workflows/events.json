@@ -1,6 +1,6 @@
 {
   "id": "SocialAgentsEvnt",
-  "name": "Social Agents - Events",
+  "name": "Social Agents - Events to Telegram",
   "active": true,
   "nodes": [
     {
@@ -12,13 +12,13 @@
         0,
         300
       ],
-      "webhookId": "social-agents-events",
       "parameters": {
         "httpMethod": "POST",
         "path": "social-agents",
-        "responseMode": "lastNode",
+        "responseMode": "onReceived",
         "options": {}
-      }
+      },
+      "webhookId": "social-agents-events"
     },
     {
       "id": "n2",
@@ -41,7 +41,7 @@
             {
               "id": "a2",
               "name": "message",
-              "value": "={{ (() => { const b = $json.body || {}; const d = b.data || {}; const a = b.account ? '@' + b.account.handle + ' (' + b.account.platform + ')' : 'Social Agents'; if (b.event === 'posts_scheduled') return a + ': ' + d.posts.length + ' new posts ' + (d.needs_approval ? 'are waiting for your approval' : 'were scheduled for auto-posting'); if (b.event === 'post_published') return a + ': published ' + d.url; if (b.event === 'post_failed') return a + ': post #' + d.id + ' failed - ' + d.error; if (b.event === 'cycle_failed') return a + ': research and content cycle failed - ' + d.error; return a + ': ' + (d.message || b.event); })() }}",
+              "value": "={{ (() => { const b = $json.body || {}; const d = b.data || {}; const a = b.account ? '@' + b.account.handle + ' (' + b.account.platform + ')' : 'Social Agents'; if (b.event === 'drafts_ready') return '📝 ' + a + ': ' + d.posts.length + ' new drafts are waiting for your approval'; if (b.event === 'post_published') return '✅ ' + a + ': published ' + d.url; if (b.event === 'post_failed') return '⚠️ ' + a + ': post #' + d.id + ' failed - ' + d.error; if (b.event === 'cycle_failed') return '⚠️ ' + a + ': research and content cycle failed - ' + d.error; return 'ℹ️ ' + a + ': ' + (d.message || b.event); })() }}",
               "type": "string"
             },
             {
@@ -63,171 +63,139 @@
     },
     {
       "id": "n3",
-      "name": "Which event?",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
+      "name": "Telegram set up?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
         440,
         300
       ],
       "parameters": {
-        "rules": {
-          "values": [
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
             {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
-                },
-                "conditions": [
-                  {
-                    "id": "posts_scheduled",
-                    "leftValue": "={{ $json.event }}",
-                    "rightValue": "posts_scheduled",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "Posts ready"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
-                },
-                "conditions": [
-                  {
-                    "id": "post_published",
-                    "leftValue": "={{ $json.event }}",
-                    "rightValue": "post_published",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "Post published"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
-                },
-                "conditions": [
-                  {
-                    "id": "post_failed",
-                    "leftValue": "={{ $json.event }}",
-                    "rightValue": "post_failed",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "Post failed"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
-                },
-                "conditions": [
-                  {
-                    "id": "cycle_failed",
-                    "leftValue": "={{ $json.event }}",
-                    "rightValue": "cycle_failed",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "Cycle failed"
+              "id": "c1",
+              "leftValue": "={{ $env.TELEGRAM_BOT_TOKEN && $env.TELEGRAM_CHAT_ID ? 'yes' : 'no' }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
-          ]
+          ],
+          "combinator": "and"
         },
+        "options": {}
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Are these new drafts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.event }}",
+              "rightValue": "drafts_ready",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n5",
+      "name": "One item per draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// one Telegram message per draft\nconst out = [];\nfor (const item of $input.all()) {\n  for (const post of item.json.data.posts || []) out.push({ json: { account: item.json.account, post } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "n6",
+      "name": "Telegram: draft with approve buttons",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TELEGRAM_API_URL || 'https://api.telegram.org' }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: '📝 Draft for @' + $json.account.handle + ' (' + $json.account.platform + ')\\n\\n' + $json.post.text + ($json.post.hashtags ? '\\n\\n' + $json.post.hashtags : '') + '\\n\\n🕒 Planned: ' + $json.post.scheduled_local + ($json.post.image_url ? '\\n🖼 ' + $json.post.image_url : ''), reply_markup: { inline_keyboard: [[{ text: '✅ Approve', callback_data: 'approve:' + $json.account.id + ':' + $json.post.id }, { text: '🚀 Approve + post now', callback_data: 'post_now:' + $json.account.id + ':' + $json.post.id }], [{ text: '📝 Keep as draft', callback_data: 'draft:' + $json.account.id + ':' + $json.post.id }]] } }) }}",
         "options": {
-          "fallbackOutput": "extra"
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
         }
       }
     },
     {
-      "id": "e0",
-      "name": "Posts ready - put Telegram, Slack or Email here",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
+      "id": "n7",
+      "name": "Telegram: notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        700,
-        60
-      ],
-      "parameters": {}
-    },
-    {
-      "id": "e1",
-      "name": "Post published - put Telegram, Slack or Email here",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        700,
-        190
-      ],
-      "parameters": {}
-    },
-    {
-      "id": "e2",
-      "name": "Post failed - put Telegram, Slack or Email here",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        700,
+        880,
         320
       ],
-      "parameters": {}
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TELEGRAM_API_URL || 'https://api.telegram.org' }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: $json.message }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
     },
     {
-      "id": "e3",
-      "name": "Cycle failed - put Telegram, Slack or Email here",
+      "id": "n8",
+      "name": "Telegram not set up - nothing sent",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        700,
-        450
-      ],
-      "parameters": {}
-    },
-    {
-      "id": "e4",
-      "name": "Other event",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        700,
-        580
+        660,
+        460
       ],
       "parameters": {}
     }
@@ -248,46 +216,54 @@
       "main": [
         [
           {
-            "node": "Which event?",
+            "node": "Telegram set up?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Which event?": {
+    "Telegram set up?": {
       "main": [
         [
           {
-            "node": "Posts ready - put Telegram, Slack or Email here",
+            "node": "Are these new drafts?",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Post published - put Telegram, Slack or Email here",
+            "node": "Telegram not set up - nothing sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Are these new drafts?": {
+      "main": [
+        [
+          {
+            "node": "One item per draft",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Post failed - put Telegram, Slack or Email here",
+            "node": "Telegram: notification",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "One item per draft": {
+      "main": [
         [
           {
-            "node": "Cycle failed - put Telegram, Slack or Email here",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Other event",
+            "node": "Telegram: draft with approve buttons",
             "type": "main",
             "index": 0
           }

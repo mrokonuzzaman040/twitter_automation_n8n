@@ -21,6 +21,9 @@ ADMIN_PASSWORD=$ADMIN_PASSWORD
 API_TOKEN=$API_TOKEN
 PANEL_PORT=8080
 N8N_PORT=5678
+# Telegram approvals (see README): bot token from @BotFather, and your chat id
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
 # Max parallel LLM requests across all agents (NVIDIA free tier is rate limited)
 LLM_CONCURRENCY=3
 GRAPH_API_VERSION=v23.0

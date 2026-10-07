@@ -73,7 +73,7 @@
             {
               "id": "s1",
               "name": "summary",
-              "value": "={{ $json.accounts.length + ' accounts, ' + $json.accounts.filter(a => a.agent_status !== 'stopped').length + ' agents running, ' + $json.accounts.reduce((n, a) => n + (a.counts.pending_approval || 0), 0) + ' posts waiting for approval, ' + $json.accounts.reduce((n, a) => n + (a.counts.failed || 0), 0) + ' failed' + ($json.master.online ? '' : ' - MASTER AGENT OFFLINE') }}",
+              "value": "={{ $json.accounts.length + ' accounts, ' + $json.accounts.filter(a => a.agent_status !== 'stopped').length + ' agents running, ' + $json.accounts.reduce((n, a) => n + (a.counts.draft || 0), 0) + ' drafts waiting for approval, ' + $json.accounts.reduce((n, a) => n + (a.counts.failed || 0), 0) + ' failed' + ($json.master.online ? '' : ' - MASTER AGENT OFFLINE') }}",
               "type": "string"
             }
           ]

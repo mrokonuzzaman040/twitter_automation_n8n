@@ -100,8 +100,7 @@ class AccountAgent(threading.Thread):
                 posts = content.generate(a, brief, len(slots), self.ctl)
                 media.attach(a, posts, self.ctl)
                 saved = scheduler.schedule(a, posts, slots, run_id, self.ctl)
-                mode = "scheduled for auto-posting" if a["post_mode"] == "auto" else "waiting for your approval"
-                db.log_event(self.id, "agent", f"Cycle #{run_id} done: {saved} posts {mode}")
+                db.log_event(self.id, "agent", f"Cycle #{run_id} done: {saved} drafts waiting for approval")
         except StopAgent:
             status, error = "stopped", "Stopped by user"
             raise

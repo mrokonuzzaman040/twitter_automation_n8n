@@ -7,3 +7,4 @@ gspread>=6.1,<7
 ddgs>=9
 tweepy>=4.14
 tzdata
+psycopg2-binary>=2.9

@@ -23,14 +23,15 @@ def free_slots(account) -> list:
         day += timedelta(days=1)
     with db.account(account["id"]) as c:
         taken = {r["scheduled_at"] for r in db.rows(
-            c, "SELECT scheduled_at FROM posts WHERE status IN ('pending_approval','scheduled','posted')")}
+            c, "SELECT scheduled_at FROM posts WHERE status IN ('draft','scheduled','posted')")}
     return sorted(s for s in slots if s not in taken)[:MAX_SLOTS]
 
 
 def schedule(account, posts, slots, run_id, ctl) -> int:
     ctl.checkpoint()
     ctl.task("Scheduler: saving schedule")
-    status = "scheduled" if account["post_mode"] == "auto" else "pending_approval"
+    status = "draft"  # nothing is published until an admin approves it
+    tz = ZoneInfo(account["timezone"])
     ids = []
     with db.account(account["id"]) as c:
         for post, slot in zip(posts, slots):
@@ -42,6 +43,8 @@ def schedule(account, posts, slots, run_id, ctl) -> int:
             ids.append(cur.lastrowid)
         saved = db.rows(c, f"SELECT * FROM posts WHERE id IN ({','.join('?' * len(ids))}) ORDER BY scheduled_at", *ids)
     sheets.safe_upsert(account, saved)
-    hooks.emit("posts_scheduled", account, {"needs_approval": status == "pending_approval", "posts": [
-        {k: p[k] for k in ("id", "text", "hashtags", "image_url", "scheduled_at", "status")} for p in saved]})
+    hooks.emit("drafts_ready", account, {"posts": [
+        {**{k: p[k] for k in ("id", "text", "hashtags", "image_url", "scheduled_at")},
+         "scheduled_local": datetime.fromisoformat(p["scheduled_at"]).astimezone(tz).strftime("%a %d %b, %H:%M")}
+        for p in saved]})
     return len(saved)

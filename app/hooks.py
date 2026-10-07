@@ -10,7 +10,7 @@ def send(event: str, account=None, data=None):
     """POST the event and return (ok, detail). Raises nothing."""
     url = db.get_setting("n8n_webhook_url", DEFAULT_URL)
     payload = {"event": event, "time": db.now(), "data": data or {},
-               "account": {k: account[k] for k in ("id", "handle", "platform", "topic", "post_mode")} if account else None}
+               "account": {k: account[k] for k in ("id", "handle", "platform", "topic", "timezone")} if account else None}
     try:
         r = httpx.post(url, json=payload, timeout=10)
     except httpx.HTTPError as e:

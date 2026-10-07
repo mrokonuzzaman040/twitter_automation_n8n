@@ -34,6 +34,10 @@ services:
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false" # workflows read the two variables below
       SOCIAL_AGENTS_URL: http://web:8080
       SOCIAL_AGENTS_TOKEN: ${API_TOKEN}
+      # Telegram approvals: bot token from @BotFather and the chat that may approve posts
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_API_URL: ${TELEGRAM_API_URL:-https://api.telegram.org}
     ports:
       - "127.0.0.1:${N8N_PORT:-5678}:5678"
     volumes:

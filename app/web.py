@@ -1,4 +1,4 @@
-"""Admin panel: JSON API + single-page UI. Controls agents by writing the desired state the worker obeys."""
+"""Admin panel: JSON API + multi-page UI. Controls agents by writing the desired state the worker obeys."""
 import hmac
 import json
 import time
@@ -44,6 +44,31 @@ def account_or_404(account_id: int) -> dict:
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/approvals")
+def approvals():
+    return FileResponse(STATIC / "approvals.html")
+
+
+@app.get("/content")
+def content():
+    return FileResponse(STATIC / "content.html")
+
+
+@app.get("/research")
+def research():
+    return FileResponse(STATIC / "research.html")
+
+
+@app.get("/logs")
+def logs():
+    return FileResponse(STATIC / "logs.html")
+
+
+@app.get("/settings")
+def settings():
+    return FileResponse(STATIC / "settings.html")
 
 
 @app.post("/api/login")
@@ -205,22 +230,38 @@ def edit_post(account_id: int, post_id: int, body: dict = Body(...)):
         except ValueError:
             bad("Bad scheduled_at")
     action = body.get("action")
-    if action in ("approve", "retry"):
+    if action == "retry":
+        action = "post_now"
+    if action in ("approve", "post_now"):
         update.update(status="scheduled", error="")
-        # An approval that comes after the slot time publishes on the next tick instead of counting as missed.
-        if action == "retry" or (update.get("scheduled_at") or post["scheduled_at"] or "") < db.now():
+        # "Post now", or an approval that comes after the slot time, publishes on the publisher's next run.
+        if action == "post_now" or (update.get("scheduled_at") or post["scheduled_at"] or "") < db.now():
             update["scheduled_at"] = db.now()
+    elif action == "draft":
+        update["status"] = "draft"
     elif action == "reject":
         update["status"] = "rejected"
-    elif action == "unapprove":
-        update["status"] = "pending_approval"
     elif action:
         bad(f"Unknown action '{action}'")
     if update:
         with db.account(account_id) as c:
             c.execute(f"UPDATE posts SET {','.join(k + '=?' for k in update)} WHERE id=?", (*update.values(), post_id))
         sheets.safe_upsert(a, [{**post, **update}])
-    return {"ok": True}
+    if action:
+        db.log_event(account_id, "approval", f"Post #{post_id}: {action} -> {update.get('status', post['status'])}")
+    return {"ok": True, "status": update.get("status", post["status"]),
+            "scheduled_at": update.get("scheduled_at", post["scheduled_at"]), "agent_running": a["desired_state"] == "running"}
+
+
+@api.get("/drafts")
+def drafts():
+    """Every post waiting for approval, across all accounts."""
+    out = []
+    for a in db.list_accounts():
+        with db.account(a["id"]) as c:
+            out += [{**p, "account_id": a["id"], "handle": a["handle"], "platform": a["platform"]}
+                    for p in db.rows(c, "SELECT * FROM posts WHERE status='draft'")]
+    return sorted(out, key=lambda p: p["scheduled_at"] or "")
 
 
 @api.get("/accounts/{account_id}/research")

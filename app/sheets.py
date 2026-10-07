@@ -20,7 +20,6 @@ ALIASES = {
     "post_times": ["post_times", "post times", "times"],
     "timezone": ["timezone", "time zone", "tz"],
     "cycle_hours": ["cycle_hours", "cycle hours"],
-    "post_mode": ["post_mode", "post mode", "mode"],
     "schedule_sheet_id": ["schedule_sheet", "schedule sheet", "schedule_sheet_id"],
     "target_profiles": ["target_profiles", "target profiles", "targets", "target accounts", "competitors"],
 }

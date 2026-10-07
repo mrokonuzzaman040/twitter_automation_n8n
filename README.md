@@ -1,15 +1,20 @@
 # Social Agents
 
 Automated research, content creation, scheduling and posting for many X/Twitter and Instagram accounts at once.
-Everything runs in Docker and is controlled from a web admin panel.
+Everything runs in Docker and is controlled from a web admin panel. A local n8n instance runs alongside it and runs
+the approval pipeline: Telegram notification, Approve buttons, and the decision back to the agents.
 
 You give it a list of accounts and a topic for each. For every account it runs its own agent that:
 
-1. researches the topic (latest news, recent B2B offers, trending topics, viral posts, viral content),
+1. researches the topic on the web (latest news, recent B2B offers, trending topics, viral posts, viral content)
+   and on the social platform itself (top posts for the topic, and the recent posts of the target profiles you list),
 2. writes posts from that research,
 3. finds a Pinterest image for each post,
 4. schedules the posts into that account's posting times and writes them to a Google Sheet,
-5. publishes each post to the account when its time arrives.
+5. sends every draft to you in Telegram with Approve buttons, and lists it on the Approvals page of the panel,
+6. publishes a post **only after an admin approved it**. Anything not approved stays a draft and is never posted.
+
+There is no automatic posting mode.
 
 ---
 
@@ -28,11 +33,12 @@ You give it a list of accounts and a topic for each. For every account it runs i
 11. [Data storage](#11-data-storage)
 12. [Security](#12-security)
 13. [AI providers](#13-ai-providers)
-14. [API reference](#14-api-reference)
-15. [Project structure](#15-project-structure)
-16. [Operations](#16-operations)
-17. [Troubleshooting](#17-troubleshooting)
-18. [Known limitations](#18-known-limitations)
+14. [n8n and Telegram approvals](#14-n8n-and-telegram-approvals)
+15. [API reference](#15-api-reference)
+16. [Project structure](#16-project-structure)
+17. [Operations](#17-operations)
+18. [Troubleshooting](#18-troubleshooting)
+19. [Known limitations](#19-known-limitations)
 
 ---
 
@@ -50,9 +56,18 @@ You give it a list of accounts and a topic for each. For every account it runs i
 | Google Sheets read and write | **Not tested** (no service account was available) |
 | Real posting to X and Instagram | **Not tested** (no account credentials were available) |
 | Pinterest video search | Tested, **returns nothing** (see limitations) |
+| Target profiles: parsing, sheet column, form field | Tested, works |
+| Target profile research through web search | Tested: real posts for X profiles; Instagram profiles return little or nothing |
+| Target profile and top-post research through the X API and Instagram API | **Not tested** (needs your account credentials) |
+| n8n container, automatic workflow import, events arriving in n8n | Tested, works |
+| n8n calling the panel API with the API token | Tested, works |
+| Approval rule: new posts are drafts, only approved posts reach the publisher | Tested, works |
+| Approvals page: approve, approve + post now, back to draft, discard | API tested; page rendered with sample data, buttons not clicked in a browser |
+| Telegram approval pipeline in n8n (draft message with buttons, approve / post now / keep as draft, presses from other chats ignored) | Tested against a **fake Telegram server**, works |
+| Real Telegram bot | **Not tested** (no bot token was available) |
 
 Use the two test buttons in Settings to check the NVIDIA and Google Sheets connections before starting agents,
-and keep accounts in approval mode until you have seen a few real posts go out correctly.
+before starting agents. Nothing is published without your approval, so you see every post before it goes out.
 
 ---
 
@@ -70,19 +85,22 @@ and keep accounts in approval mode until you have seen a few real posts go out c
 
 ```sh
 ./setup.sh                      # first time only: creates .env and prints the admin password
-docker compose up -d --build    # build the image and start both containers
+docker compose up -d --build    # build the image and start all three containers
 ```
 
 Open **http://localhost:8080** and sign in with the `ADMIN_PASSWORD` value from `.env`.
 
-Two containers start from the same image:
+n8n is at **http://localhost:5678**. The first time you open it, it asks you to create its owner account.
 
-| Container | Command | Job |
+Three containers start:
+
+| Container | Image | Job |
 |---|---|---|
-| `web` | `uvicorn app.web:app` | Admin panel and JSON API on port 8080 |
-| `worker` | `python -m app.master` | Master agent plus one agent per account |
+| `web` | `social-agents` (built here) | Admin panel and JSON API on port 8080 |
+| `worker` | `social-agents` (built here) | Master agent plus one agent per account |
+| `n8n` | `n8nio/n8n:2.42.4` | Workflow automation on port 5678 ([section 14](#14-n8n-and-telegram-approvals)) |
 
-Both mount the same Docker volume (`data`) at `/data`. The panel never talks to the worker directly: it writes
+`web` and `worker` mount the same Docker volume (`data`) at `/data`. The panel never talks to the worker directly: it writes
 what you want (start, pause, stop) into the shared database and the worker obeys it within a few seconds.
 Restarting `web` does not interrupt running agents.
 
@@ -96,7 +114,12 @@ Created by `setup.sh`. It is never copied into the Docker image and is ignored b
 |---|---|---|
 | `MASTER_KEY` | random 64 hex chars | Encrypts every stored API key and credential. Must be 16+ characters. **Back it up.** If it changes or is lost, saved secrets cannot be decrypted and must be entered again. |
 | `ADMIN_PASSWORD` | random | Password for the admin panel. Change it here and restart `web`. |
+| `API_TOKEN` | random | Lets n8n or your own scripts call the panel API with `Authorization: Bearer <token>`. Remove it to switch API-token access off. |
 | `PANEL_PORT` | `8080` | Host port for the panel (bound to 127.0.0.1 only). |
+| `N8N_PORT` | `5678` | Host port for n8n (bound to 127.0.0.1 only). |
+| `TELEGRAM_BOT_TOKEN` | empty | Token of your Telegram bot from @BotFather. Empty means no Telegram messages are sent. |
+| `TELEGRAM_CHAT_ID` | empty | The chat that receives drafts and is allowed to approve them. Button presses from any other chat are ignored. |
+| `TZ` | `UTC` | Optional. Timezone n8n uses for its schedule triggers, e.g. `Asia/Dhaka`. |
 | `LLM_CONCURRENCY` | `3` | Maximum parallel AI requests across all agents. Lower it if you hit rate limits. |
 | `GRAPH_API_VERSION` | `v23.0` | Facebook Graph API version used for Instagram. Raise it when Meta retires this version. |
 
@@ -111,34 +134,39 @@ After editing `.env`, apply it with `docker compose up -d`.
 2. **Google Sheets (optional)** - see [section 7](#7-google-sheets). Without it, add accounts by hand in the panel;
    everything except the sheet mirror still works.
 3. **Accounts** - press **Add account** on the Dashboard, or put rows in the master sheet and press **Sync sheet now**.
-4. **Credentials** - on each account row press **Add keys** and enter that account's posting credentials
-   ([section 8](#8-posting-credentials)). Research and content creation work without them; only publishing needs them.
-5. **Start** - press **Start** on an account, or **Start all**. The first cycle begins immediately.
-6. **Approve** - open the Content page, review the posts and press **Approve**. Approved posts publish at their
-   scheduled time.
+4. **Target profiles** - in the account form (or the `target_profiles` sheet column) list the profiles the agent
+   should study for that account.
+5. **Credentials** - on each account row press **Add keys** and enter that account's posting credentials
+   ([section 8](#8-posting-credentials)). Web research and content creation work without them. Publishing needs
+   them, and so does reading the platform directly (top posts, target profiles with engagement numbers).
+6. **Start** - press **Start** on an account, or **Start all**. The first cycle begins immediately.
+7. **Telegram (recommended)** - put your bot token and chat id in `.env` ([section 14](#14-n8n-and-telegram-approvals))
+   so drafts arrive in Telegram with Approve buttons.
+8. **Approve** - press a button in Telegram, or open the **Approvals** page in the panel. Approved posts are
+   published at their planned time; "post now" publishes within 30 seconds.
 
 ---
 
 ## 6. The admin panel
 
-The sidebar on the left switches between five pages. At the bottom it shows whether the master agent (the
-`worker` container) is online, and the Sign out button. The Content item shows a yellow counter with the number
-of posts waiting for approval.
+The sidebar on the left switches between six pages. At the bottom it shows whether the master agent (the
+`worker` container) is online, and the Sign out button. The Approvals item shows a yellow counter with the number
+of drafts waiting for approval.
 
 ### Dashboard
 
-- **Stat cards**: accounts, agents running, posts pending approval, scheduled, posted, failed (totals over all accounts).
+- **Stat cards**: accounts, agents running, drafts waiting for approval, approved, posted, failed (totals over all accounts).
 - **All agents bar**:
   - **Start all / Pause all / Resume all / Stop all** apply the command to every account.
   - **Sync sheet now** makes the master agent read the master sheet on its next tick (within 3 seconds).
   - **Add account** opens the account form.
   - The text beside the title shows the time and result of the last sheet sync.
 - **Agent table**, one row per account:
-  - *Account*: handle, platform, where it came from (`panel` or `sheet`), posting mode.
-  - *Topic*: topic, posting times and timezone.
+  - *Account*: handle, platform, where it came from (`panel` or `sheet`).
+  - *Topic*: topic, posting times and timezone, and how many target profiles are set.
   - *Agent*: live status and the step it is on right now; the last error in red if the last cycle failed.
   - *Cycle*: when the last research-and-create cycle ran and when the next one is due.
-  - *Posts*: counts of pending, scheduled, posted and failed posts.
+  - *Posts*: counts of drafts, approved, posted and failed posts.
   - *Controls*:
 
 | Button | Shown when | Effect |
@@ -166,34 +194,50 @@ The page refreshes itself every 4 seconds.
 | Post times | `09:00,13:00,18:00` | Daily posting slots, 24-hour `HH:MM`, comma separated, in the account's timezone. |
 | Timezone | your browser's | IANA name such as `Asia/Dhaka`, `America/New_York`, `UTC`. |
 | Research + create every (hours) | 24 | Length of one cycle, 1 to 168. |
-| Posting | I approve each post first | `approval`: posts wait for you. `auto`: posts publish without review. |
+| Target profiles to research | empty | Profiles this account's agent studies on every cycle, up to 15. One per line or comma separated. Accepts `@handle`, a profile link (`https://x.com/name`, `https://instagram.com/name`), or `instagram:name` / `twitter:name`. A bare handle is taken as a profile on the account's own platform. |
 | Own schedule sheet | empty | A separate schedule spreadsheet for this account; overrides the one in Settings. |
+
+### Approvals
+
+Every draft waiting for a decision, from all accounts, oldest planned time first. Each row shows the account,
+the image and pin link, the text and hashtags, the research source and the planned time.
+
+| Button | Effect |
+|---|---|
+| Approve | The post will be published at its planned time. If that time has already passed, it is published within 30 seconds. |
+| Approve + post now | Asks for confirmation, then publishes within 30 seconds. |
+| Edit | Change text, hashtags, image URL, video URL and planned time. The post stays a draft. |
+| Discard | Throws the draft away. Its slot becomes free and is refilled on the next cycle. |
+| Approve all | Approves every listed draft after a confirmation. |
+
+A draft you do nothing with stays a draft forever and is never published.
+Publishing is done by the account's agent, so an approved post only goes out while that agent is running
+(not stopped or paused). The panel tells you when you approve a post for an account whose agent is not running.
 
 ### Content
 
-Pick an account and, if you want, a status filter. Each row shows the image (click to open), a link to the
-Pinterest pin and to the research source, the post text and hashtags, the scheduled time, and the status.
+Every post of one account, with a status filter. Same row layout as Approvals plus the status.
 
 | Button | Shown for | Effect |
 |---|---|---|
-| Approve | pending approval | Marks the post scheduled. If its time has already passed it publishes within 30 seconds. |
-| Reject | pending approval | Discards the post. Its slot becomes free and is refilled on the next cycle. |
-| Hold | scheduled | Sends the post back to pending approval. |
-| Post now | failed, missed, rejected | Schedules the post for right now. |
-| Edit | everything not yet posted | Change text, hashtags, image URL, video URL and scheduled time. |
-| Approve all pending | top bar | Approves every pending post of the selected account after a confirmation. |
+| Approve, Approve + post now, Discard | draft | Same as on the Approvals page. |
+| Back to draft | approved, failed, missed, discarded | Withdraws the approval or revives the post as a draft. It will not be published until approved again. |
+| Post now | failed, missed, discarded | Approves and publishes within 30 seconds. |
+| Edit | everything not yet posted | Change text, hashtags, image URL, video URL and planned time. |
 
-Every change here is also written to the schedule sheet.
+Every change here and on the Approvals page is also written to the schedule sheet and to Logs (agent `approval`).
 
 ### Research
 
 Pick an account to see its latest cycle: the AI-written brief (a summary plus 8 to 12 content angles), the raw
-findings grouped into the five categories with links, and the last 20 cycles with their result.
+findings grouped by category with links (the five web categories, plus "Top posts on the platform" and
+"Target profiles" with likes and reposts), a "What works for target profiles" summary, and the last 20 cycles
+with their result.
 
 ### Logs
 
 The newest 200 events, for all accounts or one. Each event shows the time, account, which agent wrote it
-(`master`, `agent`, `research`, `media`, `scheduler`, `publisher`, `panel`) and the message. Warnings are
+(`master`, `agent`, `research`, `media`, `scheduler`, `publisher`, `approval`, `n8n`, `panel`) and the message. Warnings are
 yellow, errors red. The log keeps the most recent 5,000 events.
 
 ### Settings
@@ -202,7 +246,9 @@ yellow, errors red. The log keeps the most recent 5,000 events.
   that will actually be used.
 - **Google Sheets**: service account key, master accounts sheet, content schedule sheet, sync interval in
   minutes (default 5), and whether accounts newly found in the sheet start automatically (default yes).
-- **Save settings**, **Test AI provider**, **Test Google Sheets**.
+- **n8n**: the webhook URL events are sent to (default `http://n8n:5678/webhook/social-agents`), an on/off switch
+  for events, a link to n8n, and whether the API token is set.
+- **Save settings**, **Test AI provider**, **Test Google Sheets**, **Send test event to n8n**.
 
 Secret fields (API key, service account key) are never sent back to the browser. Leave them blank to keep the
 saved value.
@@ -236,15 +282,15 @@ order does not matter. Only `account` and `topic` are required.
 | `post_times` | post times, times | e.g. `09:00,13:00,18:00`. |
 | `timezone` | time zone, tz | e.g. `Asia/Dhaka`. |
 | `cycle_hours` | cycle hours | 1 to 168. |
-| `post_mode` | post mode, mode | `approval` or `auto`. |
 | `schedule_sheet` | schedule sheet, schedule_sheet_id | Own schedule spreadsheet for this account. |
+| `target_profiles` | target profiles, targets, target accounts, competitors | Profiles to research, comma separated: `@handle`, profile links, or `instagram:name`. |
 
 Example:
 
-| account | platform | topic | tone | post_times | timezone | post_mode |
+| account | platform | topic | target_profiles | tone | post_times | timezone |
 |---|---|---|---|---|---|---|
-| @aitools_daily | twitter, instagram | AI tools for small business | witty | 09:00,13:00,18:00 | Asia/Dhaka | approval |
-| @saas_growth | twitter | B2B SaaS growth | expert | 10:00,16:00 | America/New_York | auto |
+| @aitools_daily | twitter | AI tools for small business | @OpenAI, @AnthropicAI, https://x.com/levelsio | witty | 09:00,13:00,18:00 | Asia/Dhaka |
+| @saas_growth | instagram | B2B SaaS growth | hubspot, canva | expert | 10:00,16:00 | America/New_York |
 
 Sync rules:
 
@@ -349,9 +395,9 @@ pressed Run now). Every 30 seconds it runs the publisher. Between every step it 
 ### One cycle
 
 1. **Find free slots.** Posting slots from 5 minutes from now until `cycle hours + 6 hours` ahead that do not
-   already have a pending, scheduled or posted post. At most 30. If there are none, the cycle ends without
+   already have a draft, approved or posted post. At most 30. If there are none, the cycle ends without
    doing research.
-2. **Research agent.** Two searches for each of the five categories, limited to the last 7 days:
+2. **Research agent.** First the web: two searches for each of five categories, limited to the last 7 days:
 
    | Category | Sources |
    |---|---|
@@ -361,29 +407,53 @@ pressed Run now). Every 30 seconds it runs the publisher. Between every step it 
    | Viral posts | DuckDuckGo limited to x.com, reddit.com, linkedin.com; DuckDuckGo "most shared" |
    | Viral content | DuckDuckGo video search sorted by views, DuckDuckGo |
 
-   All findings are saved. The AI then turns them into a brief: a summary and 8 to 12 content angles. A source
-   that fails is logged as a warning and skipped.
-3. **Content agent.** The AI writes one post per free slot from the brief, in the account's language and tone.
+   Then the social platform itself:
+
+   | Category | What is read | How |
+   |---|---|---|
+   | Top posts on the platform | X: the most relevant recent posts for the topic, ranked by likes + reposts + replies. Instagram: top posts of the topic's hashtag (first two meaningful words of the topic, e.g. `#aitools`). | The platform API with the account's own credentials. Skipped if the account has no credentials. |
+   | Target profiles | The last 10 posts of every target profile with likes, reposts/comments and a link. | Platform API first; public web search of the profile if the API cannot be used. |
+
+   When the platform API is used and when web search is used for a target profile:
+
+   | Target is on | Account has complete credentials for that platform | Method |
+   |---|---|---|
+   | the account's own platform | yes | Platform API. If the API call fails, a warning is logged and web search is used. |
+   | the account's own platform | no | Web search |
+   | the other platform | (not applicable) | Web search |
+
+   - **X API**: reading posts needs an X API plan that includes read access (the free plan is write-only).
+   - **Instagram API**: uses Business Discovery, which only works for target profiles that are Business or Creator accounts.
+   - **Web search** returns titles and snippets of the profile's recent posts without engagement numbers.
+
+   All findings are saved. The AI then turns them into a brief: a summary, a "what works for target profiles"
+   analysis (themes, hooks, formats, length), and 8 to 12 content angles. For the target profiles it is given the
+   3 best posts of every profile, and it is told to learn from them, never to copy them. A source that fails is
+   logged as a warning and skipped.
+3. **Content agent.** The AI writes one post per free slot from the brief and the target-profile analysis, in the
+   account's language and tone.
    It is given the last 20 posts so it does not repeat itself and is told not to invent facts.
    - X: body plus hashtags is forced to fit 280 characters (hashtags are dropped first, then the body is cut).
    - Instagram: a short multi-line caption with 6 to 10 hashtags.
 4. **Media agent.** For each post it searches Pinterest for the post's visual phrase and saves the image link
    and the pin link. It never reuses an image the account has already used.
 5. **Scheduler agent.** Assigns each post to a slot, saves it in the account database, and writes the rows to
-   the schedule sheet. Status is `pending_approval` in approval mode, `scheduled` in auto mode.
+   the schedule sheet. Every post is saved as a `draft`. It then sends a `drafts_ready` event to n8n, which
+   forwards each draft to Telegram with Approve buttons.
 
 Then the next cycle is set for `cycle hours` later. If a cycle fails, it is retried after 30 minutes and the
 error is shown on the Dashboard.
 
 ### Publisher agent
 
-Every 30 seconds, for scheduled posts whose time has come:
+It only ever looks at **approved** posts (status `scheduled`); drafts are invisible to it. Every 30 seconds, for
+approved posts whose time has come:
 
 - posts **one** post per run, so a backlog never goes out as a burst;
 - a post more than 12 hours overdue (the agent was stopped or paused) is marked `missed` instead of being posted late;
 - on success saves the link to the live post; on failure marks the post `failed` with the reason (it is not
   retried automatically, use **Post now**);
-- updates the schedule sheet.
+- updates the schedule sheet and sends a `post_published` or `post_failed` event to n8n.
 
 ### AI calls
 
@@ -406,16 +476,16 @@ server error is retried up to 4 times with increasing waits (4, 8, 16, 32 second
 | starting… / pausing… / stopping… | Your command is waiting for the agent to reach its next step. |
 | worker offline | The `worker` container is not running. |
 
-**Post** (Content page and schedule sheet)
+**Post** (Approvals page, Content page and schedule sheet)
 
 | Status | Meaning |
 |---|---|
-| pending_approval | Written and scheduled, waiting for your approval. |
-| scheduled | Will be published at its scheduled time. |
+| draft | Written and given a planned time, waiting for approval. Never published in this state. |
+| scheduled | Approved by an admin. Will be published at its planned time (shown as "approved" in the panel). |
 | posted | Published; a link to the post is saved. |
 | failed | Publishing was attempted and failed; the reason is shown. |
 | missed | Its time passed by more than 12 hours while the agent was not running. |
-| rejected | You discarded it. |
+| rejected | You discarded it (shown as "rejected"; can be brought back to draft). |
 
 **Cycle** (Research page): `running`, `done`, `failed`, `stopped` (you stopped the agent mid-cycle),
 `interrupted` (the worker restarted mid-cycle).
@@ -446,6 +516,9 @@ Everything lives in the Docker volume `twitter_automation_n8n_data`, mounted at 
 
 All databases are SQLite. All times are stored in UTC.
 
+n8n keeps its own data (workflows, its credentials, execution history) in a separate volume,
+`twitter_automation_n8n_n8n_data`.
+
 ---
 
 ## 12. Security
@@ -456,7 +529,11 @@ All databases are SQLite. All times are stored in UTC.
 - **Isolation.** Each account's credentials are only in that account's own database file.
 - **Panel access.** One admin password, a signed session cookie valid for 7 days, `SameSite=Strict`.
   Failed logins are delayed by one second. Every API route requires the session.
-- **Network.** The panel port is bound to `127.0.0.1` only, so it is not reachable from other machines.
+- **API token.** `API_TOKEN` gives full API access without the password. It is passed to the n8n container so
+  workflows can use it. Treat it like the password.
+- **n8n.** Has its own login, created on first open. Credentials you add inside n8n (Telegram, Slack and so on)
+  are stored by n8n in its own volume, encrypted with n8n's own key.
+- **Network.** The panel and n8n ports are bound to `127.0.0.1` only, so they are not reachable from other machines.
   There is no HTTPS. To use it from another machine, put a reverse proxy with TLS in front of it
   (Caddy, nginx, Cloudflare Tunnel) rather than changing the port binding.
 - **Secrets never leave the server.** The API returns only "saved / not saved" and the last four characters.
@@ -485,10 +562,157 @@ One provider is used for all accounts.
 
 ---
 
-## 14. API reference
+## 14. n8n and Telegram approvals
+
+A local n8n (version 2.42.4) runs in the same Docker stack at **http://localhost:5678**. The Python agents do
+the research, writing and publishing. n8n runs the approval pipeline between them and you:
+
+```
+agent writes drafts ──► n8n ──► Telegram: one message per draft with buttons
+                                   [✅ Approve] [🚀 Approve + post now] [📝 Keep as draft]
+you press a button  ──► n8n ──► panel API ──► post is approved (or stays a draft)
+agent publishes approved posts ──► n8n ──► Telegram: "published <link>" or "failed <reason>"
+```
+
+### Set up Telegram (5 minutes)
+
+1. In Telegram open **@BotFather**, send `/newbot`, follow the two questions. Copy the token it gives you.
+2. Open your new bot and press **Start** (a bot cannot message you before you do this).
+3. Get your chat id: open **@userinfobot** and press Start; it replies with your numeric id.
+   To use a group instead, add your bot to the group and use the group's id (a negative number).
+4. Put both values in `.env`:
+   ```
+   TELEGRAM_BOT_TOKEN=123456789:AA...
+   TELEGRAM_CHAT_ID=987654321
+   ```
+5. Apply: `docker compose up -d`
+6. In the panel: Settings → **Send test event to n8n**. A message "Test event from the Social Agents panel"
+   should arrive in Telegram.
+
+Without these two values everything still works; you simply approve in the panel only.
+
+### What you receive and what the buttons do
+
+For every new draft:
+
+```
+📝 Draft for @aitools_daily (twitter)
+
+<post text>
+
+<hashtags>
+
+🕒 Planned: Thu 08 Oct, 13:00
+🖼 <image link>
+[✅ Approve] [🚀 Approve + post now]
+[📝 Keep as draft]
+```
+
+| Button | Result |
+|---|---|
+| ✅ Approve | The post is approved and will be published at its planned time. |
+| 🚀 Approve + post now | The post is approved and published within 30 seconds. |
+| 📝 Keep as draft | Nothing is published. The post stays a draft; you can still approve or edit it in the panel later. |
+| (no button pressed) | Same as "Keep as draft": it stays a draft and is never published. |
+
+After a press the buttons disappear and the bot replies under the draft with what happened (within about 10
+seconds). If the account's agent is stopped or paused, the reply says so, because the post cannot go out until
+the agent runs. You also get a message when a post is published (with its link), when publishing fails, and
+when a research cycle fails.
+
+Only presses coming from the chat in `TELEGRAM_CHAT_ID` are accepted. In a group, every member of that group can approve.
+
+### The three workflows
+
+They are imported automatically the first time the n8n container starts. Open http://localhost:5678 (it asks
+you to create n8n's owner account once) to see or change them.
+
+**1. "Social Agents - Events to Telegram"** (active)
+
+```
+Event from Social Agents (webhook) → Build message → Telegram set up? ─ no → nothing sent
+                                                          │ yes
+                                                   Are these new drafts? ─ yes → One item per draft → Telegram: draft with approve buttons
+                                                          │ no
+                                                   Telegram: notification
+```
+
+**2. "Social Agents - Telegram approvals"** (active)
+
+```
+Every 10 seconds → Telegram set up? → Telegram: get button presses → Read button presses
+   ├─► From the admin chat? → Panel: apply the decision → Result text → remove the buttons → reply with the result → stop the button spinner
+   └─► Telegram: mark presses as handled
+```
+
+It asks Telegram for new button presses every 10 seconds. This polling is used instead of a Telegram webhook
+because a webhook needs a public HTTPS address and this n8n runs on localhost. Successful runs of this workflow
+are not saved to n8n's execution history, so it does not fill up.
+
+**3. "Social Agents - Daily summary and control"** (inactive example)
+
+Reads `/api/overview` every morning at 08:00 and builds a one-line summary (accounts, agents running, drafts
+waiting, failed posts). Add a notification node at the end and publish it to switch it on. It also contains an
+unconnected "start all agents" request as an example of controlling agents from n8n.
+
+### Events the agents send to n8n
+
+| Event | Sent when | `data` |
+|---|---|---|
+| `drafts_ready` | A cycle finished and wrote drafts | `posts[]` with `id`, `text`, `hashtags`, `image_url`, `scheduled_at` (UTC), `scheduled_local` (account timezone, readable) |
+| `post_published` | An approved post went live | `id`, `text`, `url` |
+| `post_failed` | Publishing an approved post failed | `id`, `text`, `error` |
+| `cycle_failed` | A research-and-create cycle failed | `run_id`, `error` |
+| `test` | You pressed **Send test event to n8n** | `message` |
+
+Envelope of every event:
+
+```json
+{
+  "event": "drafts_ready",
+  "time": "2026-10-08T03:00:00+00:00",
+  "account": {"id": 1, "handle": "aitools_daily", "platform": "twitter", "topic": "...", "timezone": "Asia/Dhaka"},
+  "data": { }
+}
+```
+
+### Variables available inside n8n
+
+| Variable | Value |
+|---|---|
+| `{{ $env.SOCIAL_AGENTS_URL }}` | `http://web:8080` (the panel, reachable from inside Docker) |
+| `{{ $env.SOCIAL_AGENTS_TOKEN }}` | the `API_TOKEN` from `.env` |
+| `{{ $env.TELEGRAM_BOT_TOKEN }}`, `{{ $env.TELEGRAM_CHAT_ID }}` | from `.env` |
+
+With the header `Authorization: Bearer {{ $env.SOCIAL_AGENTS_TOKEN }}` a workflow can call every route in
+[section 15](#15-api-reference). The Telegram calls are plain HTTP Request nodes, so no credential has to be
+created inside n8n.
+
+### Settings in the panel
+
+Settings → n8n: the webhook URL events are sent to, an on/off switch, and **Send test event to n8n**. A failed
+delivery is written to Logs as a warning and never stops an agent. With events switched off no Telegram
+messages are sent; approval in the panel still works.
+
+### Changing the shipped workflows
+
+Edit them in n8n and publish. Your edits are kept across restarts. To go back to the shipped versions see
+[section 17](#17-operations). To use a different channel (Slack, email, WhatsApp), replace the Telegram HTTP
+nodes in workflow 1; approving through that channel needs your own version of workflow 2.
+
+### Using an n8n you already run elsewhere
+
+Remove the `n8n` service from `docker-compose.yml`, import the three files from `n8n/workflows/` into your n8n
+and publish the first two. Set the webhook URL in Settings to your n8n's webhook address (from inside Docker,
+your Mac is `http://host.docker.internal:5678`). In your n8n set the environment variables `SOCIAL_AGENTS_URL=http://localhost:8080`,
+`SOCIAL_AGENTS_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`.
+
+---
+
+## 15. API reference
 
 The panel is a client of this JSON API, so anything the panel does can be scripted. All routes except login
-need the session cookie. Errors return `{"detail": "message"}`.
+need the session cookie or the header `Authorization: Bearer <API_TOKEN>`. Errors return `{"detail": "message"}`.
 
 | Method | Path | Body | Purpose |
 |---|---|---|---|
@@ -503,27 +727,35 @@ need the session cookie. Errors return `{"detail": "message"}`.
 | GET | `/api/accounts/{id}/credentials` | | Which credential fields are saved |
 | PUT | `/api/accounts/{id}/credentials` | credential fields, or `{"clear": true}` | Save or remove credentials |
 | GET | `/api/accounts/{id}/posts?status=` | | List up to 300 posts |
-| PATCH | `/api/accounts/{id}/posts/{post_id}` | any of `text`, `hashtags`, `image_url`, `video_url`, `scheduled_at`, `action` (`approve`, `reject`, `unapprove`, `retry`) | Edit or act on a post |
+| PATCH | `/api/accounts/{id}/posts/{post_id}` | any of `text`, `hashtags`, `image_url`, `video_url`, `scheduled_at`, `action` | Edit or act on a post. Actions: `approve` (publish at planned time), `post_now` (approve and publish now), `draft` (back to draft), `reject` (discard). Returns `status`, `scheduled_at`, `agent_running`. |
+| GET | `/api/drafts` | | Every draft waiting for approval, all accounts |
 | GET | `/api/accounts/{id}/research` | | Latest brief, its findings, last 20 cycles |
 | GET | `/api/events?account_id=&limit=` | | Activity log |
 | GET | `/api/settings` | | Current settings (no secrets) |
 | PUT | `/api/settings` | setting fields | Save settings |
 | POST | `/api/settings/test-llm` | | Test the AI provider |
 | POST | `/api/settings/test-sheets` | | Test reading the master sheet |
+| POST | `/api/settings/test-n8n` | | Send a test event to n8n |
 
 Example:
 
 ```sh
 curl -c cookies.txt -X POST localhost:8080/api/login -H 'Content-Type: application/json' -d '{"password":"..."}'
 curl -b cookies.txt -X POST localhost:8080/api/accounts/1/action -H 'Content-Type: application/json' -d '{"action":"pause"}'
+
+# or with the API token, no login needed
+curl -H "Authorization: Bearer $API_TOKEN" localhost:8080/api/overview
 ```
+
+Account fields: `platform`, `handle`, `topic`, `tone`, `language`, `post_times`, `timezone`, `cycle_hours`,
+`schedule_sheet_id`, `target_profiles`.
 
 ---
 
-## 15. Project structure
+## 16. Project structure
 
 ```
-docker-compose.yml     the two services and the data volume
+docker-compose.yml     the three services (web, worker, n8n) and their volumes
 Dockerfile             Python 3.12 image, non-root user
 requirements.txt       Python dependencies
 setup.sh               creates .env
@@ -535,7 +767,9 @@ app/
   llm.py               AI provider presets and the chat call with retries
   master.py            master agent: sheet sync and agent supervision (worker entrypoint)
   account_agent.py     per-account agent: loop, cycle, pause/resume/stop handling
-  research.py          research agent: sources and brief
+  research.py          research agent: web sources and brief
+  social.py            research agent: platform top posts and target profiles (X API, Instagram API, web fallback)
+  hooks.py             events sent to n8n
   content.py           content agent: post writing and length rules
   media.py             media agent: Pinterest search
   scheduler.py         scheduler agent: posting slots and saving the schedule
@@ -543,16 +777,22 @@ app/
   sheets.py            Google Sheets reading and writing
   web.py               admin panel API
   static/index.html    admin panel UI (single file)
+n8n/
+  start.sh             imports the workflows on first start, then starts n8n
+  workflows/events.json    "Social Agents - Events to Telegram"
+  workflows/approvals.json "Social Agents - Telegram approvals"
+  workflows/control.json   "Social Agents - Daily summary and control"
 ```
 
 ---
 
-## 16. Operations
+## 17. Operations
 
 ```sh
-docker compose ps                       # are both containers running?
+docker compose ps                       # are all three containers running?
 docker compose logs -f worker           # live agent activity
 docker compose logs -f web              # panel requests and errors
+docker compose logs -f n8n              # n8n
 docker compose restart worker           # restart all agents (they resume by themselves)
 docker compose down                     # stop everything, data is kept
 docker compose up -d --build            # start again / apply code changes
@@ -563,6 +803,8 @@ docker compose up -d --build            # start again / apply code changes
 ```sh
 docker run --rm -v twitter_automation_n8n_data:/data -v "$PWD":/backup alpine \
   tar czf /backup/social-agents-data.tgz -C /data .
+docker run --rm -v twitter_automation_n8n_n8n_data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/n8n-data.tgz -C /data .
 cp .env env-backup.txt
 ```
 
@@ -577,11 +819,14 @@ docker compose up -d
 
 **Change the admin password**: edit `ADMIN_PASSWORD` in `.env`, then `docker compose up -d`.
 
-**Erase everything** (all accounts, posts and saved credentials, cannot be undone): `docker compose down -v`.
+**Re-import the shipped n8n workflows** (overwrites your edits to those three workflows):
+`docker compose exec n8n rm /home/node/.n8n/.social-agents-workflows-v2 && docker compose restart n8n`.
+
+**Erase everything** (all accounts, posts, saved credentials and all n8n data, cannot be undone): `docker compose down -v`.
 
 ---
 
-## 17. Troubleshooting
+## 18. Troubleshooting
 
 | Symptom | Cause and fix |
 |---|---|
@@ -595,20 +840,40 @@ docker compose up -d
 | Test Google Sheets: permission error | The sheet is not shared with the service account email as Editor. |
 | Test Google Sheets: "needs at least 'account' and 'topic' columns" | Fix the header in row 1 of the first tab. |
 | Sheet rows are not becoming accounts | Check Logs for "skipped" rows, and that the sheet sync time on the Dashboard is recent. |
-| Cycle says "All upcoming slots already have content" | Normal: nothing new is needed until posts are published or rejected. |
+| Cycle says "All upcoming slots already have content" | Normal: every upcoming slot already has a draft or an approved post. |
 | Post failed: "Missing twitter credentials" | Press Add keys and fill all four fields. |
 | Post failed: X API 403 | The app is not set to Read and write, or the tokens were generated before changing it. Regenerate them. |
 | Post failed: "Instagram posts need an image" | The Pinterest search found nothing. Edit the post, add an image URL, press Post now. |
 | Posts marked "missed" | The agent was stopped or paused for over 12 hours past their time. Use Post now if you still want them. |
 | "Could not decrypt a stored secret" | `MASTER_KEY` changed. Restore the old `.env`, or enter the keys again. |
 | Research finds very few items | DuckDuckGo is rate limiting. It recovers by itself; fewer simultaneous accounts helps. |
+| Log: "API could not read @name ... using web search instead" | The platform API refused. On X this usually means the API plan has no read access; on Instagram the target is not a Business/Creator account. Research continues with web search. |
+| Target profiles section is empty on the Research page | No target profiles are set on the account, or web search returned nothing for them this cycle. |
+| Log: "Event ... not delivered: n8n answered 404" | The "Social Agents - Events to Telegram" workflow is not published in n8n. Open it in n8n and publish it. |
+| No Telegram messages arrive | Check `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `.env` and run `docker compose up -d`. You must have pressed Start in your bot. Press **Send test event to n8n**, then open the latest execution of "Social Agents - Events to Telegram" in n8n (Executions): the output of the Telegram node shows Telegram's answer, including its error text. |
+| Pressing a Telegram button does nothing | Wait 10 seconds (presses are collected every 10 seconds). Check that "Social Agents - Telegram approvals" is published in n8n, and that you press from the chat whose id is in `TELEGRAM_CHAT_ID`. |
+| Approved post is not published | The account's agent is stopped or paused; start it. Approved posts more than 12 hours past their time become "missed". |
+| Log: "Event ... not delivered: n8n not reachable" | The n8n container is down (`docker compose ps`), or the webhook URL in Settings is wrong. Turn events off in Settings if you do not use n8n. |
+| n8n workflow fails with an access error on `$env` | `N8N_BLOCK_ENV_ACCESS_IN_NODE` must be `false` (it is in `docker-compose.yml`). |
+| Port 5678 already in use | Change `N8N_PORT` in `.env`, then `docker compose up -d`. |
 | Port 8080 already in use | Change `PANEL_PORT` in `.env`, then `docker compose up -d`. |
 
 ---
 
-## 18. Known limitations
+## 19. Known limitations
 
-- **Not yet tested with real keys**: the NVIDIA API, Google Sheets, and posting to X and Instagram ([section 1](#1-what-has-and-has-not-been-tested)).
+- **Platform research depends on what the platforms allow.** With the X API it needs a paid plan with read
+  access. With the Instagram API it only reads Business/Creator profiles and one hashtag per cycle (Instagram
+  allows 30 different hashtags per week). Without API access the agent falls back to web search, which gives
+  post text for X profiles but little or nothing for Instagram profiles, and no engagement numbers.
+- **The agents do not log in to X or Instagram as a browser** and do not scrape them directly.
+- **n8n runs the approval pipeline, not the whole engine.** Research, writing, scheduling and the actual posting
+  run in the Python agents. n8n carries drafts to Telegram and decisions back.
+- **Telegram was tested with a simulated Telegram server only**, not with a real bot.
+- **Telegram button presses take up to about 10 seconds** to be processed, and drafts are sent as text with an
+  image link, not as an attached photo.
+- **Discarding is only possible in the panel.** In Telegram the choices are approve, approve + post now, keep as draft.
+- **Not yet tested with real keys**: the NVIDIA API, Google Sheets, platform API research, and posting to X and Instagram ([section 1](#1-what-has-and-has-not-been-tested)).
 - **Pinterest videos are not found.** Pinterest has no open search API, so it is searched through DuckDuckGo,
   which returns Pinterest images but not Pinterest videos. The `video_url` column stays empty unless you fill it by hand.
 - **Videos are never posted.** Only images are published, even if a video URL is set.
@@ -616,6 +881,7 @@ docker compose up -d
   post if that matters for an account.
 - **Reddit is not searched directly** (it blocks unauthenticated requests); viral posts come from web search.
 - **Research depends on free search endpoints** (Google News RSS, DuckDuckGo) that can rate limit or change without notice.
+- **Approved posts are published by the account's agent**, so they wait while that agent is stopped or paused.
 - **Pause and stop are not instant.** They take effect at the agent's next step; an AI request already in progress finishes first.
 - **One AI provider for all accounts**, and one admin user.
 - **The schedule sheet is output only.** Edits made in the sheet are ignored and overwritten.

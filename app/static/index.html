@@ -4,83 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Social Agents</title>
-<style>
-:root { --bg:#0f1115; --panel:#181b22; --line:#2a2f3a; --text:#e6e8ec; --muted:#8b93a3; --accent:#5b8cff;
-        --ok:#3fb97a; --warn:#e0a83a; --err:#e5645f; }
-* { box-sizing:border-box; }
-body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; }
-#app { display:flex; min-height:100vh; }
-aside { width:230px; flex-shrink:0; background:var(--panel); border-right:1px solid var(--line); display:flex;
-        flex-direction:column; padding:18px 12px; position:sticky; top:0; height:100vh; }
-.brand { display:flex; align-items:center; gap:10px; font-weight:600; font-size:15px; padding:2px 10px 18px; }
-.brand i { width:26px; height:26px; border-radius:8px; background:var(--accent); display:grid; place-items:center;
-           font-style:normal; color:#fff; font-size:13px; }
-nav { display:flex; flex-direction:column; gap:2px; }
-nav button { display:flex; align-items:center; gap:10px; text-align:left; background:none; border:0; color:var(--muted);
-             padding:9px 10px; border-radius:8px; font-size:14px; }
-nav button svg { width:17px; height:17px; flex-shrink:0; }
-nav button:hover { color:var(--text); }
-nav button.on { background:#252a35; color:var(--text); }
-nav .count { margin-left:auto; background:var(--warn); color:#1a1300; border-radius:20px; padding:0 7px; font-size:11px; font-weight:600; }
-.side-foot { margin-top:auto; display:flex; flex-direction:column; gap:10px; padding:0 4px; }
-.content { flex:1; min-width:0; }
-.topbar { display:flex; align-items:center; gap:12px; padding:20px 28px 0; }
-.topbar h1 { font-size:19px; margin:0; }
-.topbar p { margin:2px 0 0; color:var(--muted); font-size:13px; }
-main { padding:18px 28px 28px; max-width:1320px; }
-.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
-.stat { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
-.stat b { display:block; font-size:24px; font-weight:600; line-height:1.2; }
-.stat span { color:var(--muted); font-size:12px; }
-.spacer { flex:1; }
-.card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
-.card h2 { font-size:14px; margin:0 0 12px; }
-.row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-table { width:100%; border-collapse:collapse; }
-th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
-th { color:var(--muted); font-weight:500; font-size:12px; }
-tr:last-child td { border-bottom:0; }
-.tablewrap { overflow-x:auto; }
-button, .btn { background:#252a35; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 10px;
-               cursor:pointer; font:inherit; font-size:13px; }
-button:hover { border-color:var(--muted); }
-button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
-button.danger { color:var(--err); }
-input, select, textarea { background:#0f1115; color:var(--text); border:1px solid var(--line); border-radius:6px;
-                          padding:7px 9px; font:inherit; width:100%; }
-textarea { min-height:90px; resize:vertical; }
-label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
-.grid { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
-.badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:12px; background:#252a35; color:var(--muted); white-space:nowrap; }
-.badge.working, .badge.scheduled { color:var(--accent); }
-.badge.idle, .badge.posted, .badge.done, .badge.online { color:var(--ok); }
-.badge.paused, .badge.pending_approval, .badge.warn, .badge.missed, .badge.interrupted { color:var(--warn); }
-.badge.error, .badge.failed, .badge.offline, .badge.rejected { color:var(--err); }
-.nw { white-space:nowrap; }
-.muted { color:var(--muted); } .small { font-size:12px; } .err { color:var(--err); }
-.pre { white-space:pre-wrap; word-break:break-word; }
-a { color:var(--accent); text-decoration:none; }
-.thumb { width:64px; height:64px; object-fit:cover; border-radius:6px; background:#0f1115; }
-dialog { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:12px; padding:20px;
-         width:min(560px,94vw); }
-dialog::backdrop { background:rgba(0,0,0,.6); }
-dialog h3 { margin:0 0 6px; font-size:15px; }
-.actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
-#login { max-width:320px; margin:14vh auto; }
-#toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#252a35; border:1px solid var(--line);
-         padding:8px 14px; border-radius:8px; display:none; max-width:90vw; }
-.hidden { display:none !important; }
-@media (max-width:820px) {
-  .grid { grid-template-columns:1fr; }
-  #app { flex-direction:column; }
-  aside { width:auto; height:auto; position:static; flex-direction:row; flex-wrap:wrap; align-items:center; gap:8px;
-          padding:10px; border-right:0; border-bottom:1px solid var(--line); }
-  .brand { padding:2px 6px; } .brand span { display:none; }
-  nav { flex-direction:row; flex-wrap:wrap; } nav button span.label { display:none; }
-  .side-foot { margin:0 0 0 auto; flex-direction:row; align-items:center; }
-  .topbar { padding:14px 14px 0; } main { padding:14px; }
-}
-</style>
+<link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
 
@@ -95,126 +19,55 @@ dialog h3 { margin:0 0 6px; font-size:15px; }
 </div>
 
 <div id="app" class="hidden">
-  <aside>
-    <div class="brand"><i>S</i><span>Social Agents</span></div>
-    <nav id="nav">
-      <button data-tab="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="label">Dashboard</span></button>
-      <button data-tab="content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span class="label">Content</span><span class="count hidden" id="pendingCount"></span></button>
-      <button data-tab="research"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="label">Research</span></button>
-      <button data-tab="logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><span class="label">Logs</span></button>
-      <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg><span class="label">Settings</span></button>
-    </nav>
-    <div class="side-foot">
-      <span id="masterBadge" class="badge">…</span>
-      <button id="logout">Sign out</button>
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="logo">S</div>
+        <span>Social Agents</span>
+      </div>
+      <nav>
+        <a href="/" class="active">Dashboard</a>
+        <a href="/approvals">Approvals <span id="pendingCount" class="badge hidden"></span></a>
+        <a href="/content">Content</a>
+        <a href="/research">Research</a>
+        <a href="/logs">Logs</a>
+        <a href="/settings">Settings</a>
+      </nav>
+      <div class="header-right">
+        <span id="masterBadge" class="badge">…</span>
+        <button id="logout">Sign out</button>
+      </div>
     </div>
-  </aside>
+  </header>
 
   <div class="content">
-  <div class="topbar"><div><h1 id="pageTitle">Dashboard</h1><p id="pageSub"></p></div></div>
-  <main>
-    <section id="tab-dashboard">
-      <div id="notice"></div>
-      <div class="stats" id="stats"></div>
-      <div class="card">
-        <div class="row">
-          <h2 style="margin:0">All agents</h2>
-          <span id="syncInfo" class="muted small"></span>
-          <div class="spacer"></div>
-          <button data-master="start_all">Start all</button>
-          <button data-master="pause_all">Pause all</button>
-          <button data-master="resume_all">Resume all</button>
-          <button data-master="stop_all" class="danger">Stop all</button>
-          <button data-master="sync_sheet">Sync sheet now</button>
-          <button class="primary" id="addAccount">Add account</button>
-        </div>
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <p id="pageSub">Every account agent, its status and controls</p>
       </div>
-      <div class="card tablewrap">
-        <table>
-          <thead><tr><th>Account</th><th>Topic</th><th>Agent</th><th>Cycle</th><th>Posts</th><th>Controls</th></tr></thead>
-          <tbody id="accountRows"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section id="tab-content" class="hidden">
-      <div class="card row">
-        <select id="contentAccount" style="width:auto"></select>
-        <select id="contentStatus" style="width:auto">
-          <option value="">All statuses</option><option value="pending_approval">Pending approval</option>
-          <option value="scheduled">Scheduled</option><option value="posted">Posted</option>
-          <option value="failed">Failed</option><option value="rejected">Rejected</option><option value="missed">Missed</option>
-        </select>
-        <button id="approveAll">Approve all pending</button>
-      </div>
-      <div class="card tablewrap">
-        <table>
-          <thead><tr><th>Media</th><th>Post</th><th>Scheduled</th><th>Status</th><th></th></tr></thead>
-          <tbody id="postRows"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section id="tab-research" class="hidden">
-      <div class="card row"><select id="researchAccount" style="width:auto"></select></div>
-      <div id="researchBody"></div>
-    </section>
-
-    <section id="tab-logs" class="hidden">
-      <div class="card row">
-        <select id="logAccount" style="width:auto"></select>
-        <button id="refreshLogs">Refresh</button>
-      </div>
-      <div class="card tablewrap">
-        <table><thead><tr><th>Time</th><th>Account</th><th>Agent</th><th>Message</th></tr></thead><tbody id="logRows"></tbody></table>
-      </div>
-    </section>
-
-    <section id="tab-settings" class="hidden">
-      <div class="card">
-        <h2>AI provider</h2>
-        <div class="grid">
-          <div><label>Provider</label><select id="s_llm_provider"></select></div>
-          <div><label>API key <span id="keyState"></span></label><input id="s_llm_api_key" type="password" placeholder="leave blank to keep current" autocomplete="off"></div>
-          <div><label>Model (blank = provider default)</label><input id="s_llm_model"></div>
-          <div><label>Base URL (blank = provider default)</label><input id="s_llm_base_url"></div>
-        </div>
-        <div class="small muted" id="effective" style="margin-top:8px"></div>
-      </div>
-      <div class="card">
-        <h2>Google Sheets</h2>
-        <div class="small muted">Share both sheets (Editor) with the service account email: <b id="saEmail">not set</b></div>
-        <label>Service account key (upload JSON file or paste contents; blank keeps current)</label>
-        <input type="file" id="s_sa_file" accept=".json,application/json" style="margin-bottom:6px">
-        <textarea id="s_google_service_account_json" placeholder='{"type":"service_account", ...}'></textarea>
-        <div class="grid">
-          <div><label>Master accounts sheet (URL or ID)</label><input id="s_master_sheet_id"></div>
-          <div><label>Content schedule sheet (URL or ID)</label><input id="s_schedule_sheet_id"></div>
-          <div><label>Sync master sheet every (minutes)</label><input id="s_sheet_sync_minutes" type="number" min="1"></div>
-          <div><label>New accounts from the sheet</label>
-            <select id="s_auto_start_new"><option value="1">Start their agent automatically</option><option value="0">Add as stopped</option></select></div>
-        </div>
-      </div>
-      <div class="card">
-        <h2>n8n</h2>
-        <div class="small muted">Agents send an event to n8n when posts are created, published or fail. Build notifications,
-          approvals and any other automation on top of them in n8n at <a href="http://localhost:5678" target="_blank" rel="noopener noreferrer">localhost:5678</a>.
-          n8n can control the agents through this panel's API: <span id="tokenState"></span></div>
-        <div class="grid">
-          <div><label>n8n webhook URL</label><input id="s_n8n_webhook_url"></div>
-          <div><label>Send events to n8n</label><select id="s_n8n_events"><option value="1">On</option><option value="0">Off</option></select></div>
-        </div>
-      </div>
-      <div class="row">
-        <button class="primary" id="saveSettings">Save settings</button>
-        <button id="testLlm">Test AI provider</button>
-        <button id="testSheets">Test Google Sheets</button>
-        <button id="testN8n">Send test event to n8n</button>
-        <span id="testResult" class="small"></span>
-      </div>
-    </section>
-  </main>
+    </div>
+    <main>
+<div id="notice"></div>
+<div class="stats" id="stats"></div>
+<div class="card">
+  <div class="row">
+    <h2 style="margin:0">All agents</h2>
+    <span id="syncInfo" class="muted small"></span>
+    <div class="spacer"></div>
+    <button data-master="start_all">Start all</button>
+    <button data-master="pause_all">Pause all</button>
+    <button data-master="resume_all">Resume all</button>
+    <button data-master="stop_all" class="danger">Stop all</button>
+    <button data-master="sync_sheet">Sync sheet now</button>
+    <button class="primary" id="addAccount">Add account</button>
   </div>
+</div>
+<div class="card tablewrap">
+  <table>
+    <thead><tr><th>Account</th><th>Topic</th><th>Agent</th><th>Cycle</th><th>Posts</th><th>Controls</th></tr></thead>
+    <tbody id="accountRows"></tbody>
+  </table>
 </div>
 
 <dialog id="accountDlg">
@@ -227,10 +80,35 @@ dialog h3 { margin:0 0 6px; font-size:15px; }
   <div class="grid">
     <div><label>Tone (optional)</label><input id="a_tone" placeholder="e.g. witty, expert"></div>
     <div><label>Language</label><input id="a_language" value="English"></div>
-    <div><label>Post times (24h, comma separated)</label><input id="a_post_times" value="09:00,13:00,18:00"></div>
+    <div>
+      <label>Post times</label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="a_post_times" value="09:00,13:00,18:00" style="flex:1">
+        <select id="a_post_times_picker">
+          <option value="06:00">06:00</option>
+          <option value="07:00">07:00</option>
+          <option value="08:00">08:00</option>
+          <option value="09:00">09:00</option>
+          <option value="10:00">10:00</option>
+          <option value="11:00">11:00</option>
+          <option value="12:00">12:00</option>
+          <option value="13:00">13:00</option>
+          <option value="14:00">14:00</option>
+          <option value="15:00">15:00</option>
+          <option value="16:00">16:00</option>
+          <option value="17:00">17:00</option>
+          <option value="18:00">18:00</option>
+          <option value="19:00">19:00</option>
+          <option value="20:00">20:00</option>
+          <option value="21:00">21:00</option>
+          <option value="22:00">22:00</option>
+        </select>
+        <button type="button" id="a_post_times_add" class="btn">Add</button>
+      </div>
+      <div class="small muted">Pick a time and Add. Duplicates ignored.</div>
+    </div>
     <div><label>Timezone</label><input id="a_timezone" value="UTC" placeholder="Asia/Dhaka"></div>
     <div><label>Research + create every (hours)</label><input id="a_cycle_hours" type="number" min="1" max="168" value="24"></div>
-    <div><label>Posting</label><select id="a_post_mode"><option value="approval">I approve each post first</option><option value="auto">Post automatically</option></select></div>
   </div>
   <label>Target profiles to research (one per line or comma separated: handle, profile link, or instagram:handle)</label>
   <textarea id="a_target_profiles" style="min-height:70px" placeholder="@competitor1&#10;https://x.com/competitor2&#10;instagram:brandname"></textarea>
@@ -246,72 +124,17 @@ dialog h3 { margin:0 0 6px; font-size:15px; }
   <div class="actions"><button class="danger" id="clearCreds">Remove all</button><div class="spacer"></div>
     <button data-close>Cancel</button><button class="primary" id="saveCreds">Save</button></div>
 </dialog>
-
-<dialog id="postDlg">
-  <h3>Edit post</h3>
-  <label>Text</label><textarea id="p_text"></textarea>
-  <label>Hashtags</label><input id="p_hashtags">
-  <label>Image URL</label><input id="p_image_url">
-  <label>Video URL</label><input id="p_video_url">
-  <label>Scheduled time (your local time)</label><input id="p_scheduled_at" type="datetime-local">
-  <div id="postErr" class="err small"></div>
-  <div class="actions"><button data-close>Cancel</button><button class="primary" id="savePost">Save</button></div>
-</dialog>
+    </main>
+  </div>
+</div>
 
 <div id="toast"></div>
 
+<script src="/static/common.js"></script>
 <script>
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const safeUrl = u => /^https?:\/\//i.test(u || '') ? esc(u) : '';
-const when = iso => iso ? new Date(iso).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '—';
-const badge = (s, label) => `<span class="badge ${esc(s)}">${esc(label || String(s).replace(/_/g, ' '))}</span>`;
-let state = { tab: 'dashboard', accounts: [], editing: null, credFor: null, post: null };
+document.addEventListener('DOMContentLoaded', function() {
+const A_FIELDS = ['platform', 'handle', 'topic', 'tone', 'language', 'post_times', 'timezone', 'cycle_hours', 'schedule_sheet_id', 'target_profiles'];
 
-function toast(msg) {
-  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
-  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.style.display = 'none', 3500);
-}
-
-async function api(path, method = 'GET', body) {
-  const r = await fetch('/api' + path, { method, headers: body ? {'Content-Type': 'application/json'} : {},
-                                         body: body ? JSON.stringify(body) : undefined });
-  if (r.status === 401 && path !== '/login') { showLogin(); throw new Error('Login required'); }
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.detail || `Request failed (${r.status})`);
-  return data;
-}
-
-function showLogin() { $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
-function showApp() { $('login').classList.add('hidden'); $('app').classList.remove('hidden'); }
-
-$('loginForm').onsubmit = async e => {
-  e.preventDefault(); $('loginErr').textContent = '';
-  try { await api('/login', 'POST', { password: $('password').value }); $('password').value = ''; showApp(); refresh(); }
-  catch (err) { $('loginErr').textContent = err.message; }
-};
-$('logout').onclick = async () => { await api('/logout', 'POST'); showLogin(); };
-
-// ---------- tabs ----------
-const PAGES = {
-  dashboard: ['Dashboard', 'Every account agent, its status and controls'],
-  content: ['Content', 'Review, edit and approve what the agents wrote'],
-  research: ['Research', 'What the research agent found on the last cycle'],
-  logs: ['Logs', 'Activity from the master agent and every account agent'],
-  settings: ['Settings', 'AI provider, Google Sheets and n8n connection'],
-};
-$('pageSub').textContent = PAGES.dashboard[1];
-$('nav').onclick = e => {
-  const btn = e.target.closest('button[data-tab]'); if (!btn) return;
-  const tab = btn.dataset.tab;
-  state.tab = tab;
-  [$('pageTitle').textContent, $('pageSub').textContent] = PAGES[tab];
-  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-  document.querySelectorAll('main > section').forEach(s => s.classList.toggle('hidden', s.id !== 'tab-' + tab));
-  ({ content: loadPosts, research: loadResearch, logs: loadLogs, settings: loadSettings }[tab] || refresh)();
-};
-
-// ---------- dashboard ----------
 function controls(a) {
   const b = (action, label, cls = '') => `<button class="${cls}" data-action="${action}" data-id="${a.id}">${label}</button>`;
   let out = '';
@@ -343,36 +166,79 @@ async function refresh() {
   $('masterBadge').textContent = m.online ? '● Master agent online' : '● Master agent offline';
   $('syncInfo').textContent = m.sheet_sync_at ? `Sheet sync ${when(m.sheet_sync_at)}: ${m.sheet_sync_result}` : 'Sheet sync not configured';
   $('notice').innerHTML = m.llm_ready ? '' :
-    '<div class="card"><span class="badge warn">Setup</span> Add your NVIDIA API key in <b>Settings</b> before starting agents.</div>';
+    '<div class="card"><span class="badge warn">Setup</span> Add your NVIDIA API key in <a href="/settings">Settings</a> before starting agents.</div>';
   const sum = k => data.accounts.reduce((n, a) => n + (a.counts[k] || 0), 0);
   const live = data.accounts.filter(a => m.online && !['stopped', 'paused'].includes(a.agent_status)).length;
-  $('stats').innerHTML = [[data.accounts.length, 'Accounts'], [live, 'Agents running'], [sum('pending_approval'), 'Pending approval'],
-    [sum('scheduled'), 'Scheduled'], [sum('posted'), 'Posted'], [sum('failed'), 'Failed']]
+  $('stats').innerHTML = [[data.accounts.length, 'Accounts'], [live, 'Agents running'], [sum('draft'), 'Waiting for approval'],
+    [sum('scheduled'), 'Approved'], [sum('posted'), 'Posted'], [sum('failed'), 'Failed']]
     .map(([n, label]) => `<div class="stat"><b>${n}</b><span>${label}</span></div>`).join('');
-  $('pendingCount').textContent = sum('pending_approval');
-  $('pendingCount').classList.toggle('hidden', !sum('pending_approval'));
+  $('pendingCount').textContent = sum('draft');
+  $('pendingCount').classList.toggle('hidden', !sum('draft'));
   $('accountRows').innerHTML = data.accounts.map(a => {
     const n = a.counts;
     return `<tr>
-      <td><b>@${esc(a.handle)}</b><div class="small muted">${esc(a.platform)} · ${esc(a.source)} · ${a.post_mode === 'auto' ? 'auto-post' : 'approval'}</div></td>
+      <td><b>@${esc(a.handle)}</b><div class="small muted">${esc(a.platform)} · ${esc(a.source)}</div></td>
       <td>${esc(a.topic)}<div class="small muted">${esc(a.post_times)} ${esc(a.timezone)}</div>
           <div class="small muted">${a.target_profiles ? a.target_profiles.split('\n').length + ' target profiles' : 'no target profiles'}</div></td>
       <td>${agentCell(a, m.online)}</td>
       <td class="small nw">last ${when(a.last_cycle_at)}<br>next ${a.desired_state === 'running' ? when(a.next_cycle_at) : '—'}</td>
-      <td class="small nw">${n.pending_approval || 0} pending<br>${n.scheduled || 0} scheduled<br>${n.posted || 0} posted${n.failed ? `<br><span class="err">${n.failed} failed</span>` : ''}</td>
+      <td class="small nw">${n.draft || 0} drafts<br>${n.scheduled || 0} approved<br>${n.posted || 0} posted${n.failed ? `<br><span class="err">${n.failed} failed</span>` : ''}</td>
       <td><div class="row">${controls(a)}</div></td></tr>`;
-  }).join('') || '<tr><td colspan="6" class="muted">No accounts yet. Add one here, or connect your master Google Sheet in Settings.</td></tr>';
-  fillAccountSelects();
+  }).join('') || '<tr><td colspan="6" class="muted">No accounts yet. Add one here, or connect your master Google Sheet in <a href="/settings">Settings</a>.</td></tr>';
 }
 
-function fillAccountSelects() {
-  for (const [id, all] of [['contentAccount', false], ['researchAccount', false], ['logAccount', true]]) {
-    const sel = $(id), cur = sel.value;
-    sel.innerHTML = (all ? '<option value="0">All accounts</option>' : '') +
-      state.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
-    if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
-  }
+function openAccount(a) {
+  state.editing = a ? a.id : null;
+  $('accountDlgTitle').textContent = a ? `Edit @${a.handle}` : 'Add account';
+  const defaults = { platform: 'twitter', language: 'English', post_times: '09:00,13:00,18:00', cycle_hours: 24,
+                     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' };
+  A_FIELDS.forEach(f => $('a_' + f).value = (a ? a[f] : defaults[f]) ?? '');
+  $('accountErr').textContent = '';
+  $('accountDlg').showModal();
 }
+
+$('a_post_times_add').onclick = () => {
+  const input = $('a_post_times');
+  const picker = $('a_post_times_picker');
+  const val = picker.value;
+  if (!val) return;
+  let times = input.value.split(',').map(s=>s.trim()).filter(Boolean);
+  if (!times.includes(val)) {
+    times.push(val);
+    times.sort((a,b)=>a.localeCompare(b));
+    input.value = times.join(',');
+  }
+};
+
+$('addAccount').onclick = () => openAccount(null);
+
+$('saveAccount').onclick = async () => {
+  const body = Object.fromEntries(A_FIELDS.map(f => [f, $('a_' + f).value]));
+  try {
+    if (state.editing) await api(`/accounts/${state.editing}`, 'PUT', body); else await api('/accounts', 'POST', body);
+    $('accountDlg').close(); refresh();
+  } catch (err) { $('accountErr').textContent = err.message; }
+};
+
+async function openCreds(a) {
+  state.credFor = a.id;
+  const { fields } = await api(`/accounts/${a.id}/credentials`);
+  $('credFields').innerHTML = fields.map(f =>
+    `<label>${esc(f.key)} ${f.set ? `<span class="badge posted">saved ${esc(f.hint)}</span>` : ''}</label>
+     <input type="password" data-cred="${esc(f.key)}" autocomplete="off">`).join('');
+  $('credDlg').showModal();
+}
+
+$('saveCreds').onclick = async () => {
+  const body = {}; document.querySelectorAll('[data-cred]').forEach(i => { if (i.value.trim()) body[i.dataset.cred] = i.value; });
+  try { await api(`/accounts/${state.credFor}/credentials`, 'PUT', body); $('credDlg').close(); toast('Credentials saved'); refresh(); }
+  catch (err) { toast(err.message); }
+};
+
+$('clearCreds').onclick = async () => {
+  if (!confirm('Remove all saved credentials for this account?')) return;
+  await api(`/accounts/${state.credFor}/credentials`, 'PUT', { clear: true }); $('credDlg').close(); refresh();
+};
 
 $('accountRows').onclick = async e => {
   const { action, id } = e.target.dataset; if (!action) return;
@@ -395,183 +261,9 @@ document.querySelectorAll('[data-master]').forEach(b => b.onclick = async () => 
   catch (err) { toast(err.message); }
 });
 
-// ---------- account + credentials dialogs ----------
-const A_FIELDS = ['platform', 'handle', 'topic', 'tone', 'language', 'post_times', 'timezone', 'cycle_hours', 'post_mode', 'schedule_sheet_id', 'target_profiles'];
-document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
-
-function openAccount(a) {
-  state.editing = a ? a.id : null;
-  $('accountDlgTitle').textContent = a ? `Edit @${a.handle}` : 'Add account';
-  const defaults = { platform: 'twitter', language: 'English', post_times: '09:00,13:00,18:00', cycle_hours: 24, post_mode: 'approval',
-                     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' };
-  A_FIELDS.forEach(f => $('a_' + f).value = (a ? a[f] : defaults[f]) ?? '');
-  $('accountErr').textContent = '';
-  $('accountDlg').showModal();
-}
-$('addAccount').onclick = () => openAccount(null);
-$('saveAccount').onclick = async () => {
-  const body = Object.fromEntries(A_FIELDS.map(f => [f, $('a_' + f).value]));
-  try {
-    if (state.editing) await api(`/accounts/${state.editing}`, 'PUT', body); else await api('/accounts', 'POST', body);
-    $('accountDlg').close(); refresh();
-  } catch (err) { $('accountErr').textContent = err.message; }
-};
-
-async function openCreds(a) {
-  state.credFor = a.id;
-  const { fields } = await api(`/accounts/${a.id}/credentials`);
-  $('credFields').innerHTML = fields.map(f =>
-    `<label>${esc(f.key)} ${f.set ? `<span class="badge posted">saved ${esc(f.hint)}</span>` : ''}</label>
-     <input type="password" data-cred="${esc(f.key)}" autocomplete="off">`).join('');
-  $('credDlg').showModal();
-}
-$('saveCreds').onclick = async () => {
-  const body = {}; document.querySelectorAll('[data-cred]').forEach(i => { if (i.value.trim()) body[i.dataset.cred] = i.value; });
-  try { await api(`/accounts/${state.credFor}/credentials`, 'PUT', body); $('credDlg').close(); toast('Credentials saved'); refresh(); }
-  catch (err) { toast(err.message); }
-};
-$('clearCreds').onclick = async () => {
-  if (!confirm('Remove all saved credentials for this account?')) return;
-  await api(`/accounts/${state.credFor}/credentials`, 'PUT', { clear: true }); $('credDlg').close(); refresh();
-};
-
-// ---------- content ----------
-let posts = [];
-async function loadPosts() {
-  const id = $('contentAccount').value; if (!id) { $('postRows').innerHTML = ''; return; }
-  const status = $('contentStatus').value;
-  posts = await api(`/accounts/${id}/posts` + (status ? `?status=${status}` : ''));
-  $('postRows').innerHTML = posts.map(p => {
-    const b = (action, label, cls = '') => `<button class="${cls}" data-post="${p.id}" data-action="${action}">${label}</button>`;
-    let acts = '';
-    if (p.status === 'pending_approval') acts += b('approve', 'Approve', 'primary') + b('reject', 'Reject', 'danger');
-    if (p.status === 'scheduled') acts += b('unapprove', 'Hold');
-    if (['failed', 'missed', 'rejected'].includes(p.status)) acts += b('retry', 'Post now');
-    if (p.status !== 'posted') acts += b('edit', 'Edit');
-    const img = safeUrl(p.image_url);
-    return `<tr>
-      <td>${img ? `<a href="${img}" target="_blank" rel="noopener noreferrer"><img class="thumb" src="${img}" loading="lazy" referrerpolicy="no-referrer"></a>` : '<span class="muted small">no image</span>'}
-          ${safeUrl(p.video_url) ? `<div class="small"><a href="${safeUrl(p.video_url)}" target="_blank" rel="noopener noreferrer">video</a></div>` : ''}
-          ${safeUrl(p.media_source_url) ? `<div class="small"><a href="${safeUrl(p.media_source_url)}" target="_blank" rel="noopener noreferrer">pin</a></div>` : ''}</td>
-      <td><div class="pre">${esc(p.text)}</div><div class="small muted">${esc(p.hashtags)}</div>
-          ${safeUrl(p.source_url) ? `<div class="small"><a href="${safeUrl(p.source_url)}" target="_blank" rel="noopener noreferrer">research source</a></div>` : ''}
-          ${p.error ? `<div class="small err">${esc(p.error)}</div>` : ''}</td>
-      <td class="small">${when(p.scheduled_at)}</td>
-      <td>${badge(p.status)}${safeUrl(p.posted_url) ? `<div class="small"><a href="${safeUrl(p.posted_url)}" target="_blank" rel="noopener noreferrer">view</a></div>` : ''}</td>
-      <td><div class="row">${acts}</div></td></tr>`;
-  }).join('') || '<tr><td colspan="5" class="muted">No posts yet. Start the agent (or press Run now) on the Dashboard.</td></tr>';
-}
-$('contentAccount').onchange = $('contentStatus').onchange = loadPosts;
-
-$('postRows').onclick = async e => {
-  const { post, action } = e.target.dataset; if (!post) return;
-  const p = posts.find(x => x.id == post);
-  if (action === 'edit') {
-    state.post = p.id;
-    ['text', 'hashtags', 'image_url', 'video_url'].forEach(f => $('p_' + f).value = p[f]);
-    const d = new Date(p.scheduled_at);
-    $('p_scheduled_at').value = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    $('postErr').textContent = ''; $('postDlg').showModal(); return;
-  }
-  try { await api(`/accounts/${$('contentAccount').value}/posts/${post}`, 'PATCH', { action }); loadPosts(); }
-  catch (err) { toast(err.message); }
-};
-$('savePost').onclick = async () => {
-  const body = Object.fromEntries(['text', 'hashtags', 'image_url', 'video_url'].map(f => [f, $('p_' + f).value]));
-  if ($('p_scheduled_at').value) body.scheduled_at = new Date($('p_scheduled_at').value).toISOString();
-  try { await api(`/accounts/${$('contentAccount').value}/posts/${state.post}`, 'PATCH', body); $('postDlg').close(); loadPosts(); }
-  catch (err) { $('postErr').textContent = err.message; }
-};
-$('approveAll').onclick = async () => {
-  const id = $('contentAccount').value; if (!id) return;
-  const pending = (await api(`/accounts/${id}/posts?status=pending_approval`));
-  if (!pending.length) return toast('Nothing pending');
-  if (!confirm(`Approve ${pending.length} posts for publishing on @${state.accounts.find(a => a.id == id).handle}?`)) return;
-  for (const p of pending) await api(`/accounts/${id}/posts/${p.id}`, 'PATCH', { action: 'approve' });
-  loadPosts();
-};
-
-// ---------- research ----------
-const CATEGORIES = { latest_news: 'Latest news', b2b_offers: 'Recent B2B offers', trending_topics: 'Trending topics',
-                     viral_posts: 'Viral posts', viral_content: 'Viral content',
-                     social_trending: 'Top posts on the platform', target_profiles: 'Target profiles' };
-async function loadResearch() {
-  const id = $('researchAccount').value; if (!id) { $('researchBody').innerHTML = ''; return; }
-  const r = await api(`/accounts/${id}/research`);
-  let html = '';
-  if (r.brief) {
-    html += `<div class="card"><h2>Brief · ${when(r.brief.created_at)}</h2><p>${esc(r.brief.brief.summary)}</p>
-      ${r.brief.brief.target_insights ? `<p><b>What works for target profiles:</b> ${esc(r.brief.brief.target_insights)}</p>` : ''}
-      <table><thead><tr><th>Category</th><th>Angle</th><th>Insight</th></tr></thead><tbody>` +
-      (r.brief.brief.angles || []).map(a => `<tr><td>${badge('', CATEGORIES[a.category] || a.category)}</td>
-        <td>${safeUrl(a.url) ? `<a href="${safeUrl(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title)}</a>` : esc(a.title)}</td>
-        <td>${esc(a.insight)}</td></tr>`).join('') + '</tbody></table></div>';
-    for (const [key, label] of Object.entries(CATEGORIES)) {
-      const items = r.items.filter(i => i.category === key);
-      html += `<div class="card"><h2>${label} <span class="muted">(${items.length})</span></h2>` +
-        (items.map(i => `<div style="margin-bottom:8px">${safeUrl(i.url) ? `<a href="${safeUrl(i.url)}" target="_blank" rel="noopener noreferrer">${esc(i.title)}</a>` : esc(i.title)}
-          <span class="small muted"> · ${esc(i.source)}${i.score ? ' · ' + i.score.toLocaleString() : ''}</span>
-          <div class="small muted">${esc(i.summary.slice(0, 220))}</div></div>`).join('') || '<span class="muted small">Nothing found this run.</span>') + '</div>';
-    }
-  } else html += '<div class="card muted">No research yet for this account.</div>';
-  html += `<div class="card"><h2>Recent cycles</h2><table><tbody>` + (r.runs.map(x =>
-    `<tr><td>#${x.id}</td><td>${when(x.started_at)}</td><td>${badge(x.status)}</td><td class="small err">${esc(x.error)}</td></tr>`).join('')
-    || '<tr><td class="muted">None</td></tr>') + '</tbody></table></div>';
-  $('researchBody').innerHTML = html;
-}
-$('researchAccount').onchange = loadResearch;
-
-// ---------- logs ----------
-async function loadLogs() {
-  const id = $('logAccount').value || 0;
-  const rows = await api(`/events?account_id=${id}`);
-  const name = e => e.handle ? '@' + e.handle : (state.accounts.find(a => a.id == e.account_id) || {}).handle || (e.account_id ? '#' + e.account_id : 'system');
-  $('logRows').innerHTML = rows.map(e => `<tr><td class="small muted" style="white-space:nowrap">${when(e.ts)}</td><td class="small">${esc(name(e))}</td>
-    <td>${badge(e.level === 'info' ? '' : e.level, e.agent)}</td><td class="pre">${esc(e.message)}</td></tr>`).join('')
-    || '<tr><td colspan="4" class="muted">No events yet.</td></tr>';
-}
-$('logAccount').onchange = $('refreshLogs').onclick = loadLogs;
-
-// ---------- settings ----------
-const S_FIELDS = ['llm_provider', 'llm_model', 'llm_base_url', 'master_sheet_id', 'schedule_sheet_id', 'sheet_sync_minutes', 'auto_start_new', 'n8n_webhook_url', 'n8n_events'];
-async function loadSettings() {
-  const s = await api('/settings');
-  $('s_llm_provider').innerHTML = Object.keys(s.presets).map(p => `<option value="${p}">${p}</option>`).join('');
-  S_FIELDS.forEach(f => $('s_' + f).value = s[f] ?? '');
-  $('keyState').innerHTML = s.llm_api_key_set ? '<span class="badge posted">saved</span>' : '<span class="badge warn">not set</span>';
-  $('saEmail').textContent = s.google_service_account_email || 'not set';
-  $('effective').textContent = `In use: ${s.effective.provider} · ${s.effective.model || 'no model'} · ${s.effective.base_url || 'no base URL'}`;
-  $('s_llm_api_key').value = $('s_google_service_account_json').value = '';
-  $('s_sa_file').value = '';
-  $('tokenState').textContent = s.api_token_set ? 'API token is set (API_TOKEN in .env).' : 'no API_TOKEN in .env, so API access from n8n is off.';
-}
-$('s_sa_file').addEventListener('change', async e => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    $('s_google_service_account_json').value = text.trim();
-    toast('Service account JSON loaded from file');
-  } catch (err) { toast('Could not read file'); }
-});
-$('saveSettings').onclick = async () => {
-  const body = Object.fromEntries(S_FIELDS.map(f => [f, $('s_' + f).value]));
-  for (const f of ['llm_api_key', 'google_service_account_json']) if ($('s_' + f).value.trim()) body[f] = $('s_' + f).value.trim();
-  try { await api('/settings', 'PUT', body); toast('Settings saved'); loadSettings(); } catch (err) { toast(err.message); }
-};
-async function runTest(path) {
-  $('testResult').className = 'small muted'; $('testResult').textContent = 'Testing…';
-  const r = await api(path, 'POST');
-  $('testResult').className = 'small ' + (r.ok ? '' : 'err');
-  $('testResult').textContent = r.ok ? '✓ ' + r.reply : '✗ ' + r.error;
-}
-$('testLlm').onclick = () => runTest('/settings/test-llm');
-$('testSheets').onclick = () => runTest('/settings/test-sheets');
-$('testN8n').onclick = () => runTest('/settings/test-n8n');
-
-// ---------- boot ----------
 refresh().then(() => { if (!state.accounts) showLogin(); });
-setInterval(() => { if (state.tab === 'dashboard' && !$('app').classList.contains('hidden') && !document.querySelector('dialog[open]')) refresh(); }, 4000);
+setInterval(() => { if (!$('app').classList.contains('hidden') && !document.querySelector('dialog[open]')) refresh(); }, 5000);
+});
 </script>
 </body>
 </html>
