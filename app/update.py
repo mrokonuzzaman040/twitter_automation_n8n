@@ -10,6 +10,14 @@ import httpx
 
 from . import config
 
+# Docker SDK – connects to the Docker daemon via socket.
+# If the socket is not mounted we fall back to manual instructions.
+try:
+    import docker  # docker>=7.0
+    HAS_DOCKER_SDK = True
+except Exception:  # pragma: no cover
+    HAS_DOCKER_SDK = False
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = REPO_ROOT / "VERSION"
 
@@ -98,20 +106,25 @@ def _version_gt(v1: str, v2: str) -> bool:
 
 
 def perform_update() -> Dict[str, Any]:
-    """Return update instructions. Automatic in-container updates require docker socket mount.
-    For safety, we return manual steps which the UI can display.
+    """Apply the new release using Docker.
+
+    If the Docker socket is mounted inside the container (via docker-compose
+    volume mount) and the `docker` CLI is available (installed in the
+    Dockerfile), it will:
+      1. git fetch + git pull the release branch
+      2. docker compose pull  (pulls new image layers)
+      3. docker compose up -d --build  (recreates containers)
+
+    If the socket is unavailable we fall back to returning manual instructions.
     """
-    # In a production setup you could mount docker socket and run:
-    # docker compose pull && docker compose up -d --build
-    # Here we provide instructions for the operator.
-    msgs = [
-        "Update available. To apply:",
-        "1. SSH to host and run:",
-        "   git fetch origin && git checkout release && git pull origin release",
-        "2. docker compose pull",
-        "3. docker compose up -d --build",
-    ]
-    # Try a non-destructive git fetch to verify repo access
+    repo = config.GITHUB_REPO
+    if not repo:
+        return {"ok": False, "messages": ["GITHUB_REPO not configured"], "manual": True}
+
+    msgs = []
+    REPO_ROOT = Path(__file__).resolve().parents[1]
+
+    # 1. Git fetch + pull to get the latest release code
     try:
         subprocess.run(
             ["git", "fetch", "origin"],
@@ -120,7 +133,44 @@ def perform_update() -> Dict[str, Any]:
             capture_output=True,
             timeout=15,
         )
-        msgs.append("Git fetch succeeded.")
+        subprocess.run(
+            ["git", "checkout", "release"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            timeout=15,
+        )
+        subprocess.run(
+            ["git", "pull", "origin", "release"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            timeout=15,
+        )
+        msgs.append("Git fetch + pull on release branch succeeded.")
     except Exception as e:
-        msgs.append(f"Git fetch check failed: {e}")
-    return {"ok": True, "messages": msgs, "manual": True}
+        msgs.append(f"Git fetch/pull failed: {e}")
+        return {"ok": True, "messages": msgs, "manual": True}
+
+    # 2. Docker compose pull + up
+    try:
+        # docker compose binary is available inside the container now
+        subprocess.run(
+            ["docker", "compose", "pull"],
+            check=True,
+            capture_output=True,
+            timeout=120,
+        )
+        msgs.append("Docker compose pull completed.")
+
+        subprocess.run(
+            ["docker", "compose", "up", "-d", "--build"],
+            check=True,
+            capture_output=True,
+            timeout=180,
+        )
+        msgs.append("Docker compose up -d --build completed. Containers restarted with new image.")
+    except Exception as e:
+        msgs.append(f"Docker compose update failed: {e}")
+
+    return {"ok": True, "messages": msgs, "manual": False}

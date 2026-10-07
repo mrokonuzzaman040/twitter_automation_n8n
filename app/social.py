@@ -125,6 +125,9 @@ def plan(account):
             else (lambda: ig_hashtag(topic, creds))
         steps.append(("social_trending", f"top posts on {name}", [search]))
     targets = db.parse_targets(account["target_profiles"], platform)
+    # profiles listed in the sheet's Target_Profiles tab apply to every account on that platform
+    shared = [t for t in db.parse_targets(db.get_setting("sheet_target_profiles"), "twitter") if t[0] == platform]
+    targets = list(dict.fromkeys(targets + shared))[:db.MAX_TARGETS]
     if targets:
         steps.append(("target_profiles", f"{len(targets)} target profiles",
                       [_target(account, creds, p, h) for p, h in targets]))

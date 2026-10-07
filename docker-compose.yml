@@ -10,6 +10,8 @@ services:
       - "127.0.0.1:${PANEL_PORT:-8080}:8080"
     volumes:
       - data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/host:ro
     restart: unless-stopped
 
   # Master agent: syncs the accounts sheet and runs one agent per account

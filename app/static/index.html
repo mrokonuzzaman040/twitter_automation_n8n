@@ -21,18 +21,22 @@
 <div id="app" class="hidden">
   <button class="menu-toggle">☰</button>
   <aside>
-    <button class="sidebar-toggle">◀</button>
-    <div class="brand">
-      <div class="logo">S</div>
-      <span>Social Agents</span>
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="logo">S</div>
+        <span>Social Agents</span>
+      </div>
+      <button class="sidebar-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 3 13 21"/><polyline points="5 3 5 21"/></svg>
+      </button>
     </div>
     <nav>
-      <a href="/" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="label">Dashboard</span></a>
-      <a href="/approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg><span class="label">Approvals</span> <span id="pendingCount" class="badge hidden"></span></a>
-      <a href="/content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span class="label">Content</span></a>
-      <a href="/research"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="label">Research</span></a>
-      <a href="/logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><span class="label">Logs</span></a>
-      <a href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg><span class="label">Settings</span></a>
+      <a href="/" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="label">Dashboard</span></a>
+      <a href="/approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg><span class="label">Approvals</span> <span id="pendingCount" class="badge hidden"></span></a>
+      <a href="/content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span class="label">Content</span></a>
+      <a href="/research"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="label">Research</span></a>
+      <a href="/logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><span class="label">Logs</span></a>
+      <a href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg><span class="label">Settings</span></a>
     </nav>
     <div class="side-foot">
       <span id="masterBadge" class="badge">…</span>
@@ -41,18 +45,18 @@
   </aside>
 
   <div class="content">
-    <nav class="navbar">
-      <div class="navbar-left">
-        <div class="navbar-brand">
-          <div class="logo" style="width:28px;height:28px;font-size:10px;">S</div>
-          <span>Social Agents</span>
+    <header class="header">
+      <div class="header-left">
+        <div>
+          <h1 class="page-title" id="pageTitle">Dashboard</h1>
+          <p class="page-subtitle" id="pageSub">Every account agent, its status and controls</p>
         </div>
       </div>
-      <div class="navbar-right">
-        <button class="navbar-btn theme-toggle" title="Toggle theme">
+      <div class="header-right">
+        <button class="header-btn theme-toggle" title="Toggle theme">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
         </button>
-        <button class="navbar-btn" title="Notifications">
+        <button class="header-btn" title="Notifications">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notification-badge hidden" id="notificationCount">0</span>
         </button>
@@ -73,39 +77,39 @@
             </a>
           </div>
         </div>
+        <div class="status-indicator">
+          <span class="status-dot" id="n8nStatusDot"></span>
+          <span class="status-text">n8n</span>
+        </div>
       </div>
-    </nav>
-    <div class="topbar">
-      <div>
-        <h1 id="pageTitle">Dashboard</h1>
-        <p id="pageSub">Every account agent, its status and controls</p>
-      </div>
-      <div class="status-indicator">
-        <span class="status-dot" id="n8nStatusDot"></span>
-        <span class="status-text">n8n</span>
-      </div>
-    </div>
+    </header>
     <main>
 <div id="notice"></div>
 <div class="stats" id="stats"></div>
-<div class="card">
-  <div class="row">
-    <h2 style="margin:0">All agents</h2>
-    <span id="syncInfo" class="muted small"></span>
-    <div class="spacer"></div>
-    <button data-master="start_all">Start all</button>
-    <button data-master="pause_all">Pause all</button>
-    <button data-master="resume_all">Resume all</button>
-    <button data-master="stop_all" class="danger">Stop all</button>
-    <button data-master="sync_sheet">Sync sheet now</button>
-    <a href="/add-account" class="button primary" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;background:var(--accent);color:#fff;border:1px solid var(--accent);">Add account</a>
+
+<div class="card panel">
+  <div class="panel-head">
+    <div>
+      <h2 class="panel-title">All agents</h2>
+      <span id="syncInfo" class="small muted panel-sub"></span>
+    </div>
+    <div class="row" style="justify-content:flex-end;gap:8px">
+      <div class="btn-group">
+        <button data-master="start_all">Start all</button>
+        <button data-master="pause_all">Pause all</button>
+        <button data-master="resume_all">Resume all</button>
+        <button data-master="stop_all">Stop all</button>
+      </div>
+      <button data-master="sync_sheet">Sync sheet</button>
+      <a href="/add-account" class="btn primary" style="text-decoration:none">+ Add account</a>
+    </div>
   </div>
-</div>
-<div class="card tablewrap">
-  <table>
-    <thead><tr><th>Account</th><th>Topic</th><th>Agent</th><th>Cycle</th><th>Posts</th><th>Controls</th></tr></thead>
-    <tbody id="accountRows"></tbody>
-  </table>
+  <div class="tablewrap" style="border:0;border-radius:0">
+    <table>
+      <thead><tr><th>Account</th><th>Topic &amp; schedule</th><th>Agent</th><th>Cycle</th><th>Posts</th><th>Actions</th></tr></thead>
+      <tbody id="accountRows"></tbody>
+    </table>
+  </div>
 </div>
 
 <dialog id="credDlg">
@@ -160,22 +164,27 @@ async function refresh() {
     '<div class="card"><span class="badge warn">Setup</span> Add your NVIDIA API key in <a href="/settings">Settings</a> before starting agents.</div>';
   const sum = k => data.accounts.reduce((n, a) => n + (a.counts[k] || 0), 0);
   const live = data.accounts.filter(a => m.online && !['stopped', 'paused'].includes(a.agent_status)).length;
-  $('stats').innerHTML = [[data.accounts.length, 'Accounts'], [live, 'Agents running'], [sum('draft'), 'Waiting for approval'],
-    [sum('scheduled'), 'Approved'], [sum('posted'), 'Posted'], [sum('failed'), 'Failed']]
-    .map(([n, label]) => `<div class="stat"><b>${n}</b><span>${label}</span></div>`).join('');
+  const tiles = [[data.accounts.length, 'Accounts'], [live, 'Agents running'], [sum('draft'), 'Waiting for approval'],
+    [sum('scheduled'), 'Approved'], [sum('posted'), 'Posted'], [sum('failed'), 'Failed']];
+  $('stats').innerHTML = tiles.map(([n, label], i) =>
+    `<div class="stat${i === 5 && n ? ' err-num' : ''}"><b>${n}</b><span>${label}</span></div>`).join('');
   $('pendingCount').textContent = sum('draft');
   $('pendingCount').classList.toggle('hidden', !sum('draft'));
   $('accountRows').innerHTML = data.accounts.map(a => {
     const n = a.counts;
+    const posts = [['draft', n.draft], ['approved', n.scheduled], ['posted', n.posted]]
+      .map(([l, v]) => `<div class="small muted nw">${l} <span class="pill">${v || 0}</span></div>`).join('')
+      + (n.failed ? `<div class="small nw">failed <span class="pill err">${n.failed}</span></div>` : '');
     return `<tr>
-      <td><b>@${esc(a.handle)}</b><div class="small muted">${esc(a.platform)} · ${esc(a.source)}</div></td>
-      <td>${esc(a.topic)}<div class="small muted">${esc(a.post_times)} ${esc(a.timezone)}</div>
-          <div class="small muted">${a.target_profiles ? a.target_profiles.split('\n').length + ' target profiles' : 'no target profiles'}</div>
-          <div class="small muted">${a.llm_model ? 'Model: ' + esc(a.llm_model) : 'Model: global default'}</div></td>
+      <td><div class="acct"><div class="avatar">${esc((a.handle || '?').charAt(0).toUpperCase())}</div>
+        <div><b>@${esc(a.handle)}</b><div class="small muted">${esc(a.platform)} · ${esc(a.source)}</div></div></div></td>
+      <td><div>${esc(a.topic)}</div>
+          <div class="small muted">${esc(a.post_times)} · ${esc(a.timezone)}</div>
+          <div class="small muted">${a.target_profiles ? a.target_profiles.split('\n').length + ' target profiles' : 'no target profiles'} · ${a.llm_model ? 'model: ' + esc(a.llm_model) : 'model: global default'}</div></td>
       <td>${agentCell(a, m.online)}</td>
       <td class="small nw">last ${when(a.last_cycle_at)}<br>next ${a.desired_state === 'running' ? when(a.next_cycle_at) : '—'}</td>
-      <td class="small nw">${n.draft || 0} drafts<br>${n.scheduled || 0} approved<br>${n.posted || 0} posted${n.failed ? `<br><span class="err">${n.failed} failed</span>` : ''}</td>
-      <td><div class="row">${controls(a)}</div></td></tr>`;
+      <td>${posts}</td>
+      <td><div class="row" style="gap:6px">${controls(a)}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="muted">No accounts yet. Add one here, or connect your master Google Sheet in <a href="/settings">Settings</a>.</td></tr>';
 }
 
@@ -220,12 +229,14 @@ document.querySelectorAll('[data-master]').forEach(b => b.onclick = async () => 
 });
 
 async function checkN8nStatus() {
-  const dot = $('n8nStatusDot');
+  const el = $('n8nChip');
   try {
     const response = await api('/n8n-status');
-    dot.className = response.online ? 'status-dot online' : 'status-dot offline';
+    el.className = 'chip ' + (response.online ? 'online' : 'offline');
+    el.textContent = response.online ? 'n8n online' : 'n8n offline';
   } catch (err) {
-    dot.className = 'status-dot offline';
+    el.className = 'chip offline';
+    el.textContent = 'n8n offline';
   }
 }
 

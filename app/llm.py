@@ -108,8 +108,12 @@ def list_models(provider: str, base_url: str, api_key: str, force: bool = False)
     return {"models": models, "error": error, "cached": False}
 
 
-MAX_TOKENS_CAP = 8000
-MAX_THINK_RETRIES = 3
+MAX_TOKENS_CAP = 12000
+MAX_THINK_RETRIES = 2
+# Models seen answering with reasoning_content ("thinking" models). They are asked for low reasoning
+# effort from then on: left alone, some spend minutes and thousands of tokens thinking before a short
+# answer. False = the provider rejected the parameter for that model, so it is not sent again.
+_reasoning_effort = {}
 
 
 def chat(system: str, user: str, temperature: float = 0.7, max_tokens: int = 3000, model: str = "") -> str:
@@ -126,6 +130,8 @@ def chat(system: str, user: str, temperature: float = 0.7, max_tokens: int = 300
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+    if _reasoning_effort.get(model):
+        payload["reasoning_effort"] = "low"
 
     def post():
         t0 = time.time()
@@ -146,10 +152,14 @@ def chat(system: str, user: str, temperature: float = 0.7, max_tokens: int = 300
                 choice, message = body["choices"][0], body["choices"][0]["message"]
                 content = (message.get("content") or "").strip()
                 reasoning = message.get("reasoning_content") or ""
-                # "Reasoning" models think in reasoning_content and answer in content - if the token budget
-                # ran out mid-thought, content is empty. Give it a few chances with more room before giving up.
+                if reasoning and model not in _reasoning_effort:
+                    _reasoning_effort[model] = True
+                    payload["reasoning_effort"] = "low"  # applies to the retries below and to later calls
+                # finish_reason "length" = the token budget ran out, so the answer is cut off (or, for a
+                # "reasoning" model that thinks in reasoning_content first, missing entirely). A truncated
+                # answer is useless as JSON, so ask again with more room before giving up.
                 tries = 0
-                while not content and reasoning and choice.get("finish_reason") == "length" \
+                while choice.get("finish_reason") == "length" \
                         and payload["max_tokens"] < MAX_TOKENS_CAP and tries < MAX_THINK_RETRIES:
                     payload["max_tokens"] = min(payload["max_tokens"] * 2, MAX_TOKENS_CAP)
                     tries += 1
@@ -173,6 +183,10 @@ def chat(system: str, user: str, temperature: float = 0.7, max_tokens: int = 300
                                    total_tokens=usage.get("total_tokens", 0), duration_ms=duration_ms)
                 return re.sub(r"<think>.*?</think>", "", content, flags=re.S).strip()
             last, last_status, last_body = f"HTTP {r.status_code}: {r.text[:300]}", r.status_code, r.text[:300]
+            if r.status_code in (400, 422) and "reasoning_effort" in payload:
+                _reasoning_effort[model] = False  # this model does not take the parameter - ask again without it
+                del payload["reasoning_effort"]
+                continue
             if r.status_code not in (429, 500, 502, 503, 504):
                 break
         time.sleep(4 * 2 ** attempt)

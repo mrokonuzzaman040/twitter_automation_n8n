@@ -6,6 +6,9 @@ WORKDIR /srv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install Docker CLI so the container can talk to the host Docker daemon via socket.
+RUN apt-get update && apt-get install -y --no-install-recommends docker.io git && rm -rf /var/lib/apt/lists/*
+
 COPY app ./app
 
 # Run unprivileged; /data is the shared volume (control DB + one DB per account).

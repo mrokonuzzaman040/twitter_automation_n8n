@@ -1,5 +1,6 @@
 """Research agent: gathers fresh material on an account's topic, then has the LLM turn it into a brief."""
 import json
+import re
 import threading
 import time
 import xml.etree.ElementTree as ET
@@ -58,23 +59,34 @@ def ddg_videos(query, n=6):
     return sorted(out, key=lambda x: -x["score"])
 
 
+def subtopics(topic: str) -> list:
+    """A topic like "AI engineering, indie hacking and solopreneurship" is three searches, not one:
+    searched as a single phrase it matches almost nothing."""
+    parts = [p.strip() for p in re.split(r"[,;/&|]|\band\b", topic) if len(p.strip()) > 2]
+    return parts[:3] or [topic]
+
+
 def _plan(topic):
+    subs = subtopics(topic)
+    each = max(3, 8 // len(subs))
+
+    def per(fn, template="{}"):
+        """One source run once per sub-topic, results merged."""
+        return [lambda q=template.format(sub): fn(q, each) for sub in subs]
+
     return [
-        ("latest_news", "latest news", [
-            lambda: google_news(topic),
-            lambda: ddg_news(topic)]),
-        ("b2b_offers", "recent B2B offers from companies", [
-            lambda: google_news(f'{topic} (B2B OR partnership OR deal OR enterprise OR "launches")'),
-            lambda: ddg_text(f"{topic} B2B offer partnership announcement")]),
-        ("trending_topics", "trending topics", [
-            lambda: ddg_text(f"{topic} trends this week"),
-            lambda: google_news(f"{topic} trending")]),
-        ("viral_posts", "viral posts", [
-            lambda: ddg_text(f"{topic} viral post (site:x.com OR site:reddit.com OR site:linkedin.com)"),
-            lambda: ddg_text(f"{topic} most shared post this week")]),
-        ("viral_content", "viral content", [
-            lambda: ddg_videos(topic),
-            lambda: ddg_text(f"most viral {topic} video reel this week")]),
+        ("latest_news", "latest news",
+         per(google_news) + per(ddg_news)),
+        ("b2b_offers", "recent B2B offers from companies",
+         per(google_news, '{} (B2B OR partnership OR deal OR enterprise OR "launches")')
+         + per(ddg_text, "{} B2B offer partnership announcement")),
+        ("trending_topics", "trending topics",
+         per(ddg_text, "{} trends this week") + per(google_news, "{} trending")),
+        ("viral_posts", "viral posts",
+         per(ddg_text, "{} viral post (site:x.com OR site:reddit.com OR site:linkedin.com)")
+         + per(ddg_text, "{} most shared post this week")),
+        ("viral_content", "viral content",
+         per(ddg_videos) + per(ddg_text, "most viral {} video reel this week")),
     ]
 
 

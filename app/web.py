@@ -324,7 +324,7 @@ def events(account_id: int = 0, limit: int = 50, offset: int = 0,
 
 PLAIN_SETTINGS = ["llm_provider", "llm_base_url", "llm_model", "master_sheet_id", "schedule_sheet_id",
                   "sheet_sync_minutes", "auto_start_new", "n8n_webhook_url", "n8n_events",
-                  "telegram_chat_id", "telegram_api_url"]
+                  "telegram_chat_id", "telegram_api_url", "google_webapp_url"]
 DEFAULT_TELEGRAM_API_URL = "https://api.telegram.org"
 
 
@@ -340,6 +340,7 @@ def get_settings():
     out["llm_api_key_set"] = bool(db.get_setting("llm_api_key"))
     out["telegram_bot_token_set"] = bool(db.get_setting("telegram_bot_token"))
     out["google_service_account_email"] = sheets.service_account_email()
+    out["sheets_mode"] = sheets.mode()
     out["presets"] = llm.PRESETS
     out["effective"] = {k: v for k, v in llm.current_config().items() if k != "api_key"}
     return out
@@ -414,7 +415,7 @@ def test_llm():
 @api.post("/settings/test-sheets")
 def test_sheets():
     try:
-        return {"ok": True, "reply": f"Master sheet readable: {len(sheets.read_master_accounts())} account rows"}
+        return {"ok": True, "reply": sheets.describe()}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"[:400]}
 

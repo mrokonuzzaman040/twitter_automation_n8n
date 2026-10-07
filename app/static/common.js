@@ -206,13 +206,24 @@ function wireModelCustomToggle(selectId, customId) {
 const menuToggle = document.querySelector('.menu-toggle');
 const sidebar = document.querySelector('aside');
 if (menuToggle && sidebar) {
-  menuToggle.onclick = () => sidebar.classList.toggle('open');
-  // Close sidebar when clicking outside on mobile
-  document.addEventListener('click', (e) => {
-    if (window.innerWidth <= 768 && sidebar.classList.contains('open') && !sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
-      sidebar.classList.remove('open');
+  menuToggle.onclick = () => {
+    sidebar.classList.toggle('open');
+    // On mobile, also add a backdrop
+    if (window.innerWidth <= 768) {
+      if (sidebar.classList.contains('open')) {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'sidebar-backdrop';
+        backdrop.onclick = () => {
+          sidebar.classList.remove('open');
+          backdrop.remove();
+        };
+        document.body.appendChild(backdrop);
+      } else {
+        const backdrop = document.querySelector('.sidebar-backdrop');
+        if (backdrop) backdrop.remove();
+      }
     }
-  });
+  };
 }
 
 // Sidebar collapse toggle
@@ -220,7 +231,11 @@ const sidebarToggle = document.querySelector('.sidebar-toggle');
 if (sidebarToggle && sidebar) {
   sidebarToggle.onclick = () => {
     sidebar.classList.toggle('collapsed');
-    sidebarToggle.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+    // Change icon based on collapsed state
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    sidebarToggle.innerHTML = isCollapsed 
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 3 13 21"/><polyline points="5 3 5 21"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>';
   };
 }
 

@@ -11,6 +11,8 @@ TICK = 3  # seconds
 def sync_sheet():
     """Create accounts for new sheet rows and apply edits made in the sheet. Rows are never deleted from here."""
     records = sheets.read_master_accounts()
+    targets = sheets.read_target_profiles()
+    db.set_setting("sheet_target_profiles", "\n".join(targets))
     auto_start = db.get_setting("auto_start_new", "1") == "1"
     created = updated = 0
     for rec in records:
@@ -28,11 +30,11 @@ def sync_sheet():
                 created += 1
         except ValueError as e:
             db.log_event(None, "master", f"Sheet row for '{rec.get('handle')}' skipped: {e}", "warn")
-    return f"{len(records)} rows, {created} added, {updated} updated"
+    return f"{len(records)} rows, {created} added, {updated} updated" + (f", {len(targets)} target profiles" if targets else "")
 
 
 def maybe_sync(last_sync):
-    if not db.get_setting("master_sheet_id") or not db.get_setting("google_service_account_json"):
+    if not db.get_setting("master_sheet_id") or not sheets.mode():
         db.set_setting("sync_now", "0")
         return last_sync
     interval = max(1, int(db.get_setting("sheet_sync_minutes", "5") or 5)) * 60
