@@ -55,29 +55,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Generate changelog
-        id: changelog
-        run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 ${{ steps.version.outputs.tag }}^ 2>/dev/null || echo "")
-          if [ -z "$PREV_TAG" ]; then
-            git log --pretty=format:"- %s (%h)" > changelog.txt
-          else
-            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" > changelog.txt
-          fi
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat changelog.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Release ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
           body: |
-            ## Changes
-            ${{ steps.changelog.outputs.changelog }}
-            
             ## Docker
+            
             ```bash
             docker pull ghcr.io/${{ steps.repo.outputs.name }}:${{ steps.version.outputs.tag }}
             docker compose pull

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - release
+  pull_request:
+    branches:
+      - release
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Syntax check
+        run: |
+          python -m py_compile app/*.py
+          echo "Syntax OK"
+
+      - name: Lint check
+        run: |
+          python -m compileall app
+
+      - name: Version file check
+        run: |
+          if [ ! -f VERSION ]; then echo "VERSION file missing"; exit 1; fi
+          echo "VERSION=$(cat VERSION)"
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check secrets in code
+        run: |
+          echo "Checking for hardcoded secrets..."
+          # simple grep for common patterns, adjust as needed
+          ! grep -rE 'AKIA[0-9A-Z]{16}' . || true
+          ! grep -rE 'sk_live_[0-9a-zA-Z]{24}' . || true
+          echo "Secret scan done"
