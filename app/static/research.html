@@ -90,13 +90,11 @@ async function loadResearch() {
 
 $('researchAccount').onchange = loadResearch;
 
-// Load accounts on page load
-api('/overview').then(data => {
-  state.accounts = data.accounts;
+boot(data => {
   const sel = $('researchAccount');
-  sel.innerHTML = state.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
-  if (state.accounts.length) loadResearch();
-}).catch(() => showLogin());
+  sel.innerHTML = data.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
+  if (data.accounts.length) loadResearch();
+});
 });
 </script>
 </body>

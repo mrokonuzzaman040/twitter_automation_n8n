@@ -143,7 +143,8 @@ $('approveAllDrafts').onclick = async () => {
   loadDrafts();
 };
 
-loadDrafts();
+boot(loadDrafts);
+setInterval(() => { if (!$('app').classList.contains('hidden') && !document.querySelector('dialog[open]')) loadDrafts(); }, 10000);
 });
 </script>
 </body>

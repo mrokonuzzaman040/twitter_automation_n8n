@@ -142,13 +142,11 @@ $('savePost').onclick = async () => {
 
 $('contentAccount').onchange = $('contentStatus').onchange = loadPosts;
 
-// Load accounts on page load
-api('/overview').then(data => {
-  state.accounts = data.accounts;
+boot(data => {
   const sel = $('contentAccount');
-  sel.innerHTML = state.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
-  if (state.accounts.length) loadPosts();
-}).catch(() => showLogin());
+  sel.innerHTML = data.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
+  if (data.accounts.length) loadPosts();
+});
 });
 </script>
 </body>

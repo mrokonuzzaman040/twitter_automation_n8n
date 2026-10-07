@@ -261,7 +261,7 @@ document.querySelectorAll('[data-master]').forEach(b => b.onclick = async () => 
   catch (err) { toast(err.message); }
 });
 
-refresh().then(() => { if (!state.accounts) showLogin(); });
+boot(refresh);
 setInterval(() => { if (!$('app').classList.contains('hidden') && !document.querySelector('dialog[open]')) refresh(); }, 5000);
 });
 </script>

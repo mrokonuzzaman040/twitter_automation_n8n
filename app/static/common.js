@@ -23,35 +23,37 @@ async function api(path, method = 'GET', body) {
 function showLogin() { $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
 function showApp() { $('login').classList.add('hidden'); $('app').classList.remove('hidden'); }
 
-async function updateHeader() {
-  try {
-    const data = await api('/overview');
-    state.accounts = data.accounts;
-    const m = data.master;
-    $('masterBadge').className = 'badge ' + (m.online ? 'online' : 'offline');
-    $('masterBadge').textContent = m.online ? '● Master agent online' : '● Master agent offline';
-    const sum = k => data.accounts.reduce((n, a) => n + (a.counts[k] || 0), 0);
-    $('pendingCount').textContent = sum('draft');
-    $('pendingCount').classList.toggle('hidden', !sum('draft'));
-  } catch (e) {
-    // Ignore errors on non-dashboard pages
+function renderHeader(data) {
+  const m = data.master;
+  $('masterBadge').className = 'badge ' + (m.online ? 'online' : 'offline');
+  $('masterBadge').textContent = m.online ? '● Master agent online' : '● Master agent offline';
+  const sum = k => data.accounts.reduce((n, a) => n + (a.counts[k] || 0), 0);
+  $('pendingCount').textContent = sum('draft');
+  $('pendingCount').classList.toggle('hidden', !sum('draft'));
+}
+
+// Every page calls this once on load: it checks the session, reveals #app (or #login on 401),
+// and keeps the header (master status, pending count) current. `onReady(data)` runs after the
+// first successful load, for the page's own content - do page setup there, not before boot().
+async function boot(onReady) {
+  let data;
+  try { data = await api('/overview'); }
+  catch (e) { return; } // api() already called showLogin() on 401; any other error leaves the page blank rather than guessing
+  state.accounts = data.accounts;
+  showApp();
+  renderHeader(data);
+  if (onReady) {
+    try { await onReady(data); } catch (e) { toast(e.message || 'Could not load this page'); }
   }
+  setInterval(() => api('/overview').then(d => { state.accounts = d.accounts; renderHeader(d); }).catch(() => {}), 10000);
 }
 
 $('loginForm').onsubmit = async e => {
   e.preventDefault(); $('loginErr').textContent = '';
-  try { await api('/login', 'POST', { password: $('password').value }); $('password').value = ''; showApp(); updateHeader(); }
+  try { await api('/login', 'POST', { password: $('password').value }); $('password').value = ''; location.reload(); }
   catch (err) { $('loginErr').textContent = err.message; }
 };
 $('logout').onclick = async () => { await api('/logout', 'POST'); showLogin(); };
 
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
-
-// Update header info on all pages
-document.addEventListener('DOMContentLoaded', function() {
-  if (!$('app').classList.contains('hidden')) {
-    updateHeader();
-    setInterval(updateHeader, 10000);
-  }
-});
 

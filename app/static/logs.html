@@ -75,13 +75,11 @@ async function loadLogs() {
 
 $('logAccount').onchange = $('refreshLogs').onclick = loadLogs;
 
-// Load accounts on page load
-api('/overview').then(data => {
-  state.accounts = data.accounts;
+boot(data => {
   const sel = $('logAccount');
-  sel.innerHTML = '<option value="0">All accounts</option>' + state.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
+  sel.innerHTML = '<option value="0">All accounts</option>' + data.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
   loadLogs();
-}).catch(() => showLogin());
+});
 });
 </script>
 </body>

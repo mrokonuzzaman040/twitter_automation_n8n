@@ -107,7 +107,13 @@ before starting agents. Nothing is published without your approval, so you see e
    ```sh
    ./setup.sh
    ```
-   This creates `.env` and prints the admin password. Save the `ADMIN_PASSWORD` value.
+   This creates `.env` with random security keys and prints the admin password. Save the `ADMIN_PASSWORD` value.
+   
+   Alternatively, you can copy `.env.example` to `.env` and fill in the values manually:
+   ```sh
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
 4. **Build and start the containers**:
    ```sh
@@ -134,7 +140,13 @@ before starting agents. Nothing is published without your approval, so you see e
    ```powershell
    bash setup.sh
    ```
-   If `bash` is not available, you can use Git Bash or WSL. This creates `.env` and prints the admin password. Save the `ADMIN_PASSWORD` value.
+   If `bash` is not available, you can use Git Bash or WSL. This creates `.env` with random security keys and prints the admin password. Save the `ADMIN_PASSWORD` value.
+   
+   Alternatively, you can copy `.env.example` to `.env` and fill in the values manually:
+   ```powershell
+   copy .env.example .env
+   # Edit .env with your configuration
+   ```
 
 4. **Build and start the containers**:
    ```powershell
@@ -176,7 +188,13 @@ before starting agents. Nothing is published without your approval, so you see e
    ```sh
    ./setup.sh
    ```
-   This creates `.env` and prints the admin password. Save the `ADMIN_PASSWORD` value.
+   This creates `.env` with random security keys and prints the admin password. Save the `ADMIN_PASSWORD` value.
+   
+   Alternatively, you can copy `.env.example` to `.env` and fill in the values manually:
+   ```sh
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
 5. **Build and start the containers**:
    ```sh
@@ -222,7 +240,13 @@ before starting agents. Nothing is published without your approval, so you see e
    ```sh
    ./setup.sh
    ```
-   This creates `.env` and prints the admin password. Save the `ADMIN_PASSWORD` value.
+   This creates `.env` with random security keys and prints the admin password. Save the `ADMIN_PASSWORD` value.
+   
+   Alternatively, you can copy `.env.example` to `.env` and fill in the values manually:
+   ```sh
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
 5. **Build and start the containers**:
    ```sh
@@ -271,11 +295,32 @@ docker compose up -d --build
 docker compose up -d
 ```
 
+### Manual Configuration
+
+If you prefer not to use `setup.sh`, you can manually configure the environment:
+
+1. Copy the example file:
+   ```sh
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and fill in the required values:
+   - Generate a random `MASTER_KEY` (64 hex characters or 16+ characters)
+   - Set a custom `ADMIN_PASSWORD`
+   - Generate a random `API_TOKEN` (or leave empty to disable API access)
+   - Add your NVIDIA API key or other AI provider key
+   - Configure optional settings (Google Sheets, Telegram, etc.)
+
+3. Start the containers:
+   ```sh
+   docker compose up -d --build
+   ```
+
 ---
 
 ## 4. Configuration file (.env)
 
-Created by `setup.sh`. It is never copied into the Docker image and is ignored by git.
+Created by `setup.sh` or by copying `.env.example` to `.env`. It is never copied into the Docker image and is ignored by git.
 
 | Variable | Default | Meaning |
 |---|---|---|

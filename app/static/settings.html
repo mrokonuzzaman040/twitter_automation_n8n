@@ -170,7 +170,7 @@ $('testLlm').onclick = () => runTest('/settings/test-llm');
 $('testSheets').onclick = () => runTest('/settings/test-sheets');
 $('testN8n').onclick = () => runTest('/settings/test-n8n');
 
-loadSettings().catch(() => showLogin());
+boot(loadSettings);
 });
 </script>
 </body>
