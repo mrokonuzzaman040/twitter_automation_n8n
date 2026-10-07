@@ -7,7 +7,7 @@ import re
 import sqlite3
 import threading
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from . import config, crypto
@@ -62,6 +62,20 @@ CREATE TABLE IF NOT EXISTS events (
     message TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_account ON events(account_id, id);
+CREATE TABLE IF NOT EXISTS llm_calls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    ok INTEGER NOT NULL,
+    error_kind TEXT NOT NULL DEFAULT '',
+    error TEXT NOT NULL DEFAULT '',
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    total_tokens INTEGER NOT NULL DEFAULT 0,
+    duration_ms INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS llm_calls_model ON llm_calls(provider, model, id);
 """
 
 CONTROL_SCHEMA_PG = """
@@ -100,6 +114,20 @@ CREATE TABLE IF NOT EXISTS events (
     message TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_account ON events(account_id, id);
+CREATE TABLE IF NOT EXISTS llm_calls (
+    id SERIAL PRIMARY KEY,
+    ts TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    ok INTEGER NOT NULL,
+    error_kind TEXT NOT NULL DEFAULT '',
+    error TEXT NOT NULL DEFAULT '',
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    total_tokens INTEGER NOT NULL DEFAULT 0,
+    duration_ms INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS llm_calls_model ON llm_calls(provider, model, id);
 """
 
 ACCOUNT_SCHEMA = """
@@ -445,3 +473,43 @@ def log_event(account_id, agent: str, message: str, level: str = "info"):
 def trim_events(keep: int = 5000):
     with control() as c:
         c.execute("DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - ?", (keep,))
+
+
+# ---------- LLM call log (model health + token/time usage) ----------
+
+def record_llm_call(provider: str, model: str, ok: bool, error_kind: str = "", error: str = "",
+                    prompt_tokens: int = 0, completion_tokens: int = 0, total_tokens: int = 0, duration_ms: int = 0):
+    with control() as c:
+        c.execute("INSERT INTO llm_calls(ts, provider, model, ok, error_kind, error, prompt_tokens, "
+                  "completion_tokens, total_tokens, duration_ms) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                  (now(), provider, model, int(ok), error_kind, str(error)[:300],
+                   int(prompt_tokens or 0), int(completion_tokens or 0), int(total_tokens or 0), int(duration_ms or 0)))
+
+
+def trim_llm_calls(keep: int = 2000):
+    with control() as c:
+        c.execute("DELETE FROM llm_calls WHERE id <= (SELECT MAX(id) FROM llm_calls) - ?", (keep,))
+
+
+def broken_models(provider: str) -> set:
+    """Models whose most recent call for this provider failed because the model itself was rejected
+    (unknown/unsupported model), as opposed to a transient auth/rate-limit/network/server error."""
+    with control() as c:
+        latest = rows(c, """
+            SELECT l.model, l.ok, l.error_kind FROM llm_calls l
+            JOIN (SELECT model, MAX(id) AS max_id FROM llm_calls WHERE provider=? GROUP BY model) m
+              ON l.model = m.model AND l.id = m.max_id
+            WHERE l.provider=?""", provider, provider)
+    return {r["model"] for r in latest if not r["ok"] and r["error_kind"] == "model"}
+
+
+def llm_usage_summary(recent_limit: int = 20) -> dict:
+    """Today's call/token/latency totals plus the most recent calls, for the Settings page."""
+    since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat(timespec="seconds")
+    with control() as c:
+        recent = rows(c, "SELECT * FROM llm_calls ORDER BY id DESC LIMIT ?", recent_limit)
+        today = one(c, "SELECT COUNT(*) AS calls, COALESCE(SUM(total_tokens),0) AS tokens, "
+                       "COALESCE(AVG(duration_ms),0) AS avg_ms, "
+                       "COALESCE(SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END),0) AS errors "
+                       "FROM llm_calls WHERE ts >= ?", since)
+    return {"recent": recent, "today": today or {"calls": 0, "tokens": 0, "avg_ms": 0, "errors": 0}}

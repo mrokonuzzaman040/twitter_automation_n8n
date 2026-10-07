@@ -57,3 +57,16 @@ $('logout').onclick = async () => { await api('/logout', 'POST'); showLogin(); }
 
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
 
+// Mobile menu toggle
+const menuToggle = document.querySelector('.menu-toggle');
+const sidebar = document.querySelector('aside');
+if (menuToggle && sidebar) {
+  menuToggle.onclick = () => sidebar.classList.toggle('open');
+  // Close sidebar when clicking outside on mobile
+  document.addEventListener('click', (e) => {
+    if (window.innerWidth <= 768 && sidebar.classList.contains('open') && !sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
+      sidebar.classList.remove('open');
+    }
+  });
+}
+

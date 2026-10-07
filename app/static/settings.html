@@ -19,26 +19,25 @@
 </div>
 
 <div id="app" class="hidden">
-  <header>
-    <div class="header-inner">
-      <div class="brand">
-        <div class="logo">S</div>
-        <span>Social Agents</span>
-      </div>
-      <nav>
-        <a href="/">Dashboard</a>
-        <a href="/approvals">Approvals <span id="pendingCount" class="badge hidden"></span></a>
-        <a href="/content">Content</a>
-        <a href="/research">Research</a>
-        <a href="/logs">Logs</a>
-        <a href="/settings" class="active">Settings</a>
-      </nav>
-      <div class="header-right">
-        <span id="masterBadge" class="badge">…</span>
-        <button id="logout">Sign out</button>
-      </div>
+  <button class="menu-toggle">☰</button>
+  <aside>
+    <div class="brand">
+      <div class="logo">S</div>
+      <span>Social Agents</span>
     </div>
-  </header>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/approvals">Approvals <span id="pendingCount" class="badge hidden"></span></a>
+      <a href="/content">Content</a>
+      <a href="/research">Research</a>
+      <a href="/logs">Logs</a>
+      <a href="/settings" class="active">Settings</a>
+    </nav>
+    <div class="side-foot">
+      <span id="masterBadge" class="badge">…</span>
+      <button id="logout">Sign out</button>
+    </div>
+  </aside>
 
   <div class="content">
     <div class="topbar">
@@ -53,10 +52,26 @@
   <div class="grid">
     <div><label>Provider</label><select id="s_llm_provider"></select></div>
     <div><label>API key <span id="keyState"></span></label><input id="s_llm_api_key" type="password" placeholder="leave blank to keep current" autocomplete="off"></div>
-    <div><label>Model (blank = provider default)</label><input id="s_llm_model"></div>
+    <div>
+      <label>Model <button type="button" id="refreshModels" class="small" style="padding:2px 8px;margin-left:4px">↻ refresh</button></label>
+      <select id="s_llm_model"></select>
+      <input id="s_llm_model_custom" class="hidden" placeholder="exact model id" style="margin-top:6px">
+      <div class="small muted" id="modelHint" style="margin-top:4px"></div>
+    </div>
     <div><label>Base URL (blank = provider default)</label><input id="s_llm_base_url"></div>
   </div>
   <div class="small muted" id="effective" style="margin-top:8px"></div>
+</div>
+<div class="card">
+  <h2>AI usage</h2>
+  <div class="small muted">Tokens and response time of every call your agents make to the AI provider.</div>
+  <div class="stats" id="usageToday" style="margin:10px 0 0"></div>
+  <div class="tablewrap" style="margin-top:10px">
+    <table>
+      <thead><tr><th>Time</th><th>Model</th><th>Tokens in/out</th><th>Time taken</th><th>Status</th></tr></thead>
+      <tbody id="usageRows"></tbody>
+    </table>
+  </div>
 </div>
 <div class="card">
   <h2>Google Sheets</h2>
@@ -102,7 +117,8 @@
 <script src="/static/common.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-const S_FIELDS = ['llm_provider', 'llm_model', 'llm_base_url', 'master_sheet_id', 'schedule_sheet_id', 'sheet_sync_minutes', 'auto_start_new', 'n8n_webhook_url', 'n8n_events'];
+const S_FIELDS = ['llm_provider', 'llm_base_url', 'master_sheet_id', 'schedule_sheet_id', 'sheet_sync_minutes', 'auto_start_new', 'n8n_webhook_url', 'n8n_events'];
+let savedModel = '';
 
 async function loadSettings() {
   const s = await api('/settings');
@@ -116,7 +132,73 @@ async function loadSettings() {
   $('s_sa_private_key').value = '';
   $('s_sa_file').value = '';
   $('tokenState').textContent = s.api_token_set ? 'API token is set (API_TOKEN in .env).' : 'no API_TOKEN in .env, so API access from n8n is off.';
+  savedModel = s.llm_model || '';
+  await loadModels();
 }
+
+async function loadModels(force) {
+  const sel = $('s_llm_model');
+  sel.innerHTML = '<option value="">Loading models…</option>';
+  sel.disabled = true;
+  $('modelHint').textContent = '';
+  try {
+    const q = new URLSearchParams({ provider: $('s_llm_provider').value, base_url: $('s_llm_base_url').value.trim(), force: force ? '1' : '0' });
+    const r = await api('/settings/models?' + q.toString());
+    sel.innerHTML = '';
+    for (const m of r.models) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.id + (m.billing ? ' — ' + m.billing : '') + (m.disabled ? ' (unavailable - last call failed)' : '');
+      opt.disabled = !!m.disabled;
+      sel.appendChild(opt);
+    }
+    const custom = document.createElement('option');
+    custom.value = '__custom__';
+    custom.textContent = 'Other (type model id manually)…';
+    sel.appendChild(custom);
+
+    if (savedModel && [...sel.options].some(o => o.value === savedModel)) {
+      sel.value = savedModel;
+      $('s_llm_model_custom').classList.add('hidden');
+    } else if (savedModel) {
+      sel.value = '__custom__';
+      $('s_llm_model_custom').value = savedModel;
+      $('s_llm_model_custom').classList.remove('hidden');
+    } else if (r.models.length) {
+      sel.value = r.models[0].id;
+    }
+    $('modelHint').textContent = r.error || `${r.models.length} model${r.models.length === 1 ? '' : 's'}` +
+      (r.cached ? ' (cached - press ↻ refresh for the latest)' : '');
+  } catch (err) {
+    sel.innerHTML = '<option value="">Could not load models</option>';
+    $('modelHint').textContent = err.message;
+  }
+  sel.disabled = false;
+}
+
+async function loadUsage() {
+  const u = await api('/settings/usage');
+  const t = u.today;
+  $('usageToday').innerHTML = [[t.calls, 'Calls (24h)'], [t.tokens, 'Tokens (24h)'],
+    [Math.round(t.avg_ms) + ' ms', 'Avg response time'], [t.errors, 'Errors (24h)']]
+    .map(([n, label]) => `<div class="stat"><b>${n}</b><span>${label}</span></div>`).join('');
+  $('usageRows').innerHTML = u.recent.map(r => `<tr>
+    <td class="small nw">${when(r.ts)}</td>
+    <td class="small">${esc(r.model)}</td>
+    <td class="small nw">${r.prompt_tokens}/${r.completion_tokens}</td>
+    <td class="small nw">${r.duration_ms} ms</td>
+    <td>${r.ok ? badge('posted', 'ok') : badge('failed', 'failed' + (r.error_kind ? ' (' + esc(r.error_kind) + ')' : ''))}</td>
+  </tr>`).join('') || '<tr><td colspan="5" class="muted">No AI calls yet.</td></tr>';
+}
+
+$('s_llm_provider').onchange = () => { savedModel = ''; loadModels(); };
+$('s_llm_base_url').addEventListener('change', () => loadModels());
+$('refreshModels').onclick = () => loadModels(true);
+$('s_llm_model').onchange = () => {
+  const custom = $('s_llm_model').value === '__custom__';
+  $('s_llm_model_custom').classList.toggle('hidden', !custom);
+  if (custom) $('s_llm_model_custom').focus();
+};
 
 $('s_sa_file').addEventListener('change', async e => {
   const file = e.target.files?.[0];
@@ -138,6 +220,7 @@ $('s_sa_file').addEventListener('change', async e => {
 
 $('saveSettings').onclick = async () => {
   const body = Object.fromEntries(S_FIELDS.map(f => [f, $('s_' + f).value]));
+  body.llm_model = $('s_llm_model').value === '__custom__' ? $('s_llm_model_custom').value.trim() : $('s_llm_model').value;
   const email = $('s_sa_email').value.trim();
   const priv = $('s_sa_private_key').value.trim();
   if (email && priv) {
@@ -170,7 +253,11 @@ $('testLlm').onclick = () => runTest('/settings/test-llm');
 $('testSheets').onclick = () => runTest('/settings/test-sheets');
 $('testN8n').onclick = () => runTest('/settings/test-n8n');
 
-boot(loadSettings);
+boot(async () => {
+  await loadSettings();
+  await loadUsage();
+  setInterval(loadUsage, 15000);
+});
 });
 </script>
 </body>

@@ -317,6 +317,23 @@ def get_settings():
     return out
 
 
+@api.get("/settings/models")
+def get_models(provider: str = "", base_url: str = "", force: bool = False):
+    provider = provider or db.get_setting("llm_provider", "nvidia")
+    preset = llm.PRESETS.get(provider, llm.PRESETS["custom"])
+    base_url = base_url or preset["base_url"]
+    result = llm.list_models(provider, base_url, db.get_setting("llm_api_key"), force=force)
+    broken = db.broken_models(provider)
+    for m in result["models"]:
+        m["disabled"] = m["id"] in broken
+    return result
+
+
+@api.get("/settings/usage")
+def get_usage():
+    return db.llm_usage_summary()
+
+
 @api.put("/settings")
 def put_settings(body: dict = Body(...)):
     if body.get("google_service_account_json"):

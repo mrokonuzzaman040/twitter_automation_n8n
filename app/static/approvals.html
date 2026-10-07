@@ -19,26 +19,25 @@
 </div>
 
 <div id="app" class="hidden">
-  <header>
-    <div class="header-inner">
-      <div class="brand">
-        <div class="logo">S</div>
-        <span>Social Agents</span>
-      </div>
-      <nav>
-        <a href="/">Dashboard</a>
-        <a href="/approvals" class="active">Approvals <span id="pendingCount" class="badge hidden"></span></a>
-        <a href="/content">Content</a>
-        <a href="/research">Research</a>
-        <a href="/logs">Logs</a>
-        <a href="/settings">Settings</a>
-      </nav>
-      <div class="header-right">
-        <span id="masterBadge" class="badge">…</span>
-        <button id="logout">Sign out</button>
-      </div>
+  <button class="menu-toggle">☰</button>
+  <aside>
+    <div class="brand">
+      <div class="logo">S</div>
+      <span>Social Agents</span>
     </div>
-  </header>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/approvals" class="active">Approvals <span id="pendingCount" class="badge hidden"></span></a>
+      <a href="/content">Content</a>
+      <a href="/research">Research</a>
+      <a href="/logs">Logs</a>
+      <a href="/settings">Settings</a>
+    </nav>
+    <div class="side-foot">
+      <span id="masterBadge" class="badge">…</span>
+      <button id="logout">Sign out</button>
+    </div>
+  </aside>
 
   <div class="content">
     <div class="topbar">

@@ -75,6 +75,7 @@ def main():
             if time.time() - last_trim > 600:
                 last_trim = time.time()
                 db.trim_events()
+                db.trim_llm_calls()
         except Exception as e:
             print(f"[error] master loop: {e!r}", flush=True)
         time.sleep(TICK)
