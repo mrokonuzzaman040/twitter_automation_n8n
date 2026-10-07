@@ -108,43 +108,75 @@ def list_models(provider: str, base_url: str, api_key: str, force: bool = False)
     return {"models": models, "error": error, "cached": False}
 
 
-def chat(system: str, user: str, temperature: float = 0.7, max_tokens: int = 3000) -> str:
+MAX_TOKENS_CAP = 8000
+MAX_THINK_RETRIES = 3
+
+
+def chat(system: str, user: str, temperature: float = 0.7, max_tokens: int = 3000, model: str = "") -> str:
+    """model overrides the globally configured one (used for an account's own model choice)."""
     cfg = current_config()
     if not cfg["api_key"]:
         raise LLMError("LLM API key is not set - add it in Settings")
-    if not cfg["base_url"] or not cfg["model"]:
+    if not cfg["base_url"] or not (model or cfg["model"]):
         raise LLMError("LLM base URL / model is not set - check Settings")
+    model = model or cfg["model"]
     payload = {
-        "model": cfg["model"],
+        "model": model,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+
+    def post():
+        t0 = time.time()
+        r = httpx.post(f"{cfg['base_url']}/chat/completions", json=payload, timeout=180,
+                       headers={"Authorization": f"Bearer {cfg['api_key']}"})
+        return r, int((time.time() - t0) * 1000)
+
     last, last_status, last_body, duration_ms = "", 0, "", 0
     for attempt in range(4):
-        t0 = time.time()
         try:
             with _slots:
-                r = httpx.post(f"{cfg['base_url']}/chat/completions", json=payload, timeout=180,
-                               headers={"Authorization": f"Bearer {cfg['api_key']}"})
+                r, duration_ms = post()
         except httpx.HTTPError as e:
             last, last_status, last_body = f"network error: {e}", 0, str(e)
         else:
-            duration_ms = int((time.time() - t0) * 1000)
             if r.status_code == 200:
                 body = r.json()
+                choice, message = body["choices"][0], body["choices"][0]["message"]
+                content = (message.get("content") or "").strip()
+                reasoning = message.get("reasoning_content") or ""
+                # "Reasoning" models think in reasoning_content and answer in content - if the token budget
+                # ran out mid-thought, content is empty. Give it a few chances with more room before giving up.
+                tries = 0
+                while not content and reasoning and choice.get("finish_reason") == "length" \
+                        and payload["max_tokens"] < MAX_TOKENS_CAP and tries < MAX_THINK_RETRIES:
+                    payload["max_tokens"] = min(payload["max_tokens"] * 2, MAX_TOKENS_CAP)
+                    tries += 1
+                    try:
+                        with _slots:
+                            r, duration_ms = post()
+                    except httpx.HTTPError:
+                        break
+                    if r.status_code != 200:
+                        break
+                    body = r.json()
+                    choice, message = body["choices"][0], body["choices"][0]["message"]
+                    content = (message.get("content") or "").strip()
+                    reasoning = message.get("reasoning_content") or ""
+                if not content and reasoning:
+                    content = reasoning.strip()  # out of retries - a reasoning-only answer beats nothing
                 usage = body.get("usage") or {}
-                db.record_llm_call(cfg["provider"], cfg["model"], ok=True,
+                db.record_llm_call(cfg["provider"], model, ok=True,
                                    prompt_tokens=usage.get("prompt_tokens", 0),
                                    completion_tokens=usage.get("completion_tokens", 0),
                                    total_tokens=usage.get("total_tokens", 0), duration_ms=duration_ms)
-                text = body["choices"][0]["message"].get("content") or ""
-                return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+                return re.sub(r"<think>.*?</think>", "", content, flags=re.S).strip()
             last, last_status, last_body = f"HTTP {r.status_code}: {r.text[:300]}", r.status_code, r.text[:300]
             if r.status_code not in (429, 500, 502, 503, 504):
                 break
         time.sleep(4 * 2 ** attempt)
-    db.record_llm_call(cfg["provider"], cfg["model"], ok=False, error_kind=_classify_error(last_status, last_body),
+    db.record_llm_call(cfg["provider"], model, ok=False, error_kind=_classify_error(last_status, last_body),
                        error=last, duration_ms=duration_ms)
     raise LLMError(f"{cfg['provider']} request failed - {last}")
 
