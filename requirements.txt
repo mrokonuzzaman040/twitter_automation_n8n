@@ -1,0 +1,9 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+itsdangerous>=2.2
+httpx>=0.27
+cryptography>=43
+gspread>=6.1,<7
+ddgs>=9
+tweepy>=4.14
+tzdata

@@ -1,0 +1,317 @@
+"""Storage.
+
+control.db            - account registry, agent state, settings, event log (shared by web + worker)
+accounts/account_N.db - one database per account: its credentials, research, posts and runs
+"""
+import sqlite3
+import threading
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+from . import config, crypto
+
+SECRET_SETTINGS = {"llm_api_key", "google_service_account_json"}
+ACCOUNT_FIELDS = ["platform", "handle", "topic", "tone", "language", "post_times", "timezone",
+                  "cycle_hours", "post_mode", "schedule_sheet_id"]
+PLATFORMS = ("twitter", "instagram")
+CREDENTIAL_FIELDS = {
+    "twitter": ["api_key", "api_secret", "access_token", "access_token_secret"],
+    "instagram": ["ig_user_id", "access_token"],
+}
+
+CONTROL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL,
+    handle TEXT NOT NULL,
+    topic TEXT NOT NULL DEFAULT '',
+    tone TEXT NOT NULL DEFAULT '',
+    language TEXT NOT NULL DEFAULT 'English',
+    post_times TEXT NOT NULL DEFAULT '09:00,13:00,18:00',
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    cycle_hours INTEGER NOT NULL DEFAULT 24,
+    post_mode TEXT NOT NULL DEFAULT 'approval',
+    schedule_sheet_id TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT 'panel',
+    desired_state TEXT NOT NULL DEFAULT 'stopped',
+    agent_status TEXT NOT NULL DEFAULT 'stopped',
+    current_task TEXT NOT NULL DEFAULT '',
+    last_error TEXT NOT NULL DEFAULT '',
+    last_cycle_at TEXT,
+    next_cycle_at TEXT,
+    heartbeat_at TEXT,
+    run_now INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER,
+    ts TEXT NOT NULL,
+    level TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    message TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS events_account ON events(account_id, id);
+"""
+
+ACCOUNT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS credentials (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    status TEXT NOT NULL,
+    error TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS research (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL DEFAULT '',
+    url TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT '',
+    score INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS briefs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    brief TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER,
+    text TEXT NOT NULL,
+    hashtags TEXT NOT NULL DEFAULT '',
+    media_query TEXT NOT NULL DEFAULT '',
+    image_url TEXT NOT NULL DEFAULT '',
+    video_url TEXT NOT NULL DEFAULT '',
+    media_source_url TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
+    scheduled_at TEXT,
+    status TEXT NOT NULL,
+    posted_url TEXT NOT NULL DEFAULT '',
+    error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    posted_at TEXT
+);
+"""
+
+_initialised = set()
+_init_lock = threading.Lock()
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def to_utc_iso(value: str) -> str:
+    """Normalise any ISO timestamp to the UTC format used for storage (so strings compare correctly)."""
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+@contextmanager
+def _conn(path, schema):
+    c = sqlite3.connect(path, timeout=20)
+    c.row_factory = sqlite3.Row
+    try:
+        key = str(path)
+        if key not in _initialised:
+            with _init_lock:
+                c.execute("PRAGMA journal_mode=WAL")
+                c.executescript(schema)
+                _initialised.add(key)
+        yield c
+        c.commit()
+    finally:
+        c.close()
+
+
+def control():
+    return _conn(config.DATA_DIR / "control.db", CONTROL_SCHEMA)
+
+
+def account_path(account_id: int):
+    return config.DATA_DIR / "accounts" / f"account_{int(account_id)}.db"
+
+
+def account(account_id: int):
+    return _conn(account_path(account_id), ACCOUNT_SCHEMA)
+
+
+def rows(c, sql, *args):
+    return [dict(r) for r in c.execute(sql, args).fetchall()]
+
+
+def one(c, sql, *args):
+    r = c.execute(sql, args).fetchone()
+    return dict(r) if r else None
+
+
+# ---------- settings ----------
+
+def get_setting(key: str, default: str = "") -> str:
+    with control() as c:
+        r = one(c, "SELECT value FROM settings WHERE key=?", key)
+    if not r or r["value"] == "":
+        return default
+    return crypto.decrypt(r["value"]) if key in SECRET_SETTINGS else r["value"]
+
+
+def set_setting(key: str, value: str):
+    value = str(value)
+    if key in SECRET_SETTINGS and value:
+        value = crypto.encrypt(value)
+    with control() as c:
+        c.execute("INSERT INTO settings(key, value) VALUES(?, ?) "
+                  "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
+
+
+# ---------- accounts ----------
+
+def normalize_account(data: dict, partial: bool = False) -> dict:
+    """Validate and clean user/sheet supplied account fields. Raises ValueError with a readable message."""
+    out = {}
+    for k in ACCOUNT_FIELDS:
+        if k in data and data[k] is not None and str(data[k]).strip() != "":
+            out[k] = str(data[k]).strip()
+    if "handle" in out:
+        out["handle"] = out["handle"].lstrip("@").strip()
+    if not partial:
+        if not out.get("handle"):
+            raise ValueError("Account handle is required")
+        if not out.get("topic"):
+            raise ValueError("Topic is required")
+        out.setdefault("platform", "twitter")
+    if "platform" in out:
+        out["platform"] = out["platform"].lower()
+        if out["platform"] not in PLATFORMS:
+            raise ValueError("Platform must be twitter or instagram")
+    if "post_times" in out:
+        out["post_times"] = ",".join(f"{h:02d}:{m:02d}" for h, m in parse_times(out["post_times"]))
+    if "timezone" in out:
+        try:
+            ZoneInfo(out["timezone"])
+        except Exception:
+            raise ValueError(f"Unknown timezone '{out['timezone']}' (use e.g. Asia/Dhaka, America/New_York, UTC)")
+    if "cycle_hours" in out:
+        try:
+            out["cycle_hours"] = max(1, min(168, int(float(out["cycle_hours"]))))
+        except ValueError:
+            raise ValueError("cycle_hours must be a number")
+    if "post_mode" in out:
+        out["post_mode"] = out["post_mode"].lower()
+        if out["post_mode"] not in ("approval", "auto"):
+            raise ValueError("post_mode must be approval or auto")
+    return out
+
+
+def parse_times(value: str):
+    times = []
+    for part in str(value).replace(";", ",").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            h, m = part.split(":")
+            h, m = int(h), int(m)
+            assert 0 <= h < 24 and 0 <= m < 60
+        except Exception:
+            raise ValueError(f"Bad post time '{part}' (use 24h HH:MM, comma separated)")
+        times.append((h, m))
+    if not times:
+        raise ValueError("At least one post time is required")
+    return sorted(set(times))
+
+
+def list_accounts(include_deleted: bool = False):
+    with control() as c:
+        sql = "SELECT * FROM accounts" + ("" if include_deleted else " WHERE deleted=0") + " ORDER BY id"
+        return rows(c, sql)
+
+
+def get_account(account_id: int):
+    with control() as c:
+        return one(c, "SELECT * FROM accounts WHERE id=?", account_id)
+
+
+def find_account(platform: str, handle: str):
+    with control() as c:
+        return one(c, "SELECT * FROM accounts WHERE deleted=0 AND platform=? AND lower(handle)=lower(?)",
+                   platform, handle)
+
+
+def create_account(data: dict, source: str = "panel", desired_state: str = "stopped") -> int:
+    data = normalize_account(data)
+    if find_account(data["platform"], data["handle"]):
+        raise ValueError(f"{data['platform']} account @{data['handle']} already exists")
+    cols = list(data) + ["source", "desired_state", "created_at"]
+    vals = list(data.values()) + [source, desired_state, now()]
+    with control() as c:
+        cur = c.execute(f"INSERT INTO accounts({','.join(cols)}) VALUES({','.join('?' * len(cols))})", vals)
+        account_id = cur.lastrowid
+    with account(account_id):
+        pass  # creates the per-account database
+    return account_id
+
+
+def update_account(account_id: int, **fields):
+    if not fields:
+        return
+    sets = ",".join(f"{k}=?" for k in fields)
+    with control() as c:
+        c.execute(f"UPDATE accounts SET {sets} WHERE id=?", (*fields.values(), account_id))
+
+
+def purge_account(account_id: int):
+    """Remove a deleted account's row and its database files."""
+    with control() as c:
+        c.execute("DELETE FROM accounts WHERE id=?", (account_id,))
+        c.execute("DELETE FROM events WHERE account_id=?", (account_id,))
+    p = account_path(account_id)
+    _initialised.discard(str(p))
+    for suffix in ("", "-wal", "-shm"):
+        f = p.with_name(p.name + suffix)
+        if f.exists():
+            f.unlink()
+
+
+# ---------- per-account credentials ----------
+
+def get_credentials(account_id: int) -> dict:
+    with account(account_id) as c:
+        return {r["key"]: crypto.decrypt(r["value"]) for r in rows(c, "SELECT key, value FROM credentials")}
+
+
+def set_credentials(account_id: int, values: dict):
+    with account(account_id) as c:
+        for k, v in values.items():
+            c.execute("INSERT INTO credentials(key, value) VALUES(?, ?) "
+                      "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (k, crypto.encrypt(str(v).strip())))
+
+
+def clear_credentials(account_id: int):
+    with account(account_id) as c:
+        c.execute("DELETE FROM credentials")
+
+
+# ---------- events ----------
+
+def log_event(account_id, agent: str, message: str, level: str = "info"):
+    print(f"[{level}] account={account_id} {agent}: {message}", flush=True)
+    with control() as c:
+        c.execute("INSERT INTO events(account_id, ts, level, agent, message) VALUES(?,?,?,?,?)",
+                  (account_id, now(), level, agent, str(message)[:2000]))
+
+
+def trim_events(keep: int = 5000):
+    with control() as c:
+        c.execute("DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - ?", (keep,))

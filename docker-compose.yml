@@ -1,0 +1,26 @@
+services:
+  # Admin panel + JSON API
+  web:
+    build: .
+    image: social-agents
+    command: uvicorn app.web:app --host 0.0.0.0 --port 8080
+    env_file: .env
+    ports:
+      # Bound to localhost only. Put a reverse proxy with TLS in front before exposing it.
+      - "127.0.0.1:${PANEL_PORT:-8080}:8080"
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+  # Master agent: syncs the accounts sheet and runs one agent per account
+  worker:
+    build: .
+    image: social-agents
+    command: python -m app.master
+    env_file: .env
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+volumes:
+  data:
