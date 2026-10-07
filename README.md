@@ -83,14 +83,157 @@ before starting agents. Nothing is published without your approval, so you see e
 
 ## 3. Install and run
 
-```sh
-./setup.sh                      # first time only: creates .env and prints the admin password
-docker compose up -d --build    # build the image and start all three containers
-```
+### Prerequisites (All Operating Systems)
 
-Open **http://localhost:8080** and sign in with the `ADMIN_PASSWORD` value from `.env`.
+- Docker with Docker Compose v2 (Docker Desktop on macOS/Windows, or Docker Engine on Linux)
+- `openssl` command-line tool (only used once by `setup.sh`)
+- An NVIDIA API key from https://build.nvidia.com (or a key for another supported provider)
+- Optional: a Google Cloud service account for Google Sheets
+- Per account you want to post from: X developer app keys, or an Instagram Graph API token
 
-n8n is at **http://localhost:5678**. The first time you open it, it asks you to create its owner account.
+### macOS
+
+1. **Install Docker Desktop** (if not already installed):
+   - Download from https://www.docker.com/products/docker-desktop/
+   - Install and start Docker Desktop
+   - Verify installation: `docker --version` and `docker compose version`
+
+2. **Clone or download this repository** and navigate to it:
+   ```sh
+   cd /path/to/twitter_automation_n8n
+   ```
+
+3. **Run setup** (first time only):
+   ```sh
+   ./setup.sh
+   ```
+   This creates `.env` and prints the admin password. Save the `ADMIN_PASSWORD` value.
+
+4. **Build and start the containers**:
+   ```sh
+   docker compose up -d --build
+   ```
+
+5. **Access the applications**:
+   - Admin panel: http://localhost:8080
+   - n8n: http://localhost:5678 (first time, create an owner account)
+
+### Windows
+
+1. **Install Docker Desktop** (if not already installed):
+   - Download from https://www.docker.com/products/docker-desktop/
+   - Install and start Docker Desktop
+   - Verify installation in PowerShell: `docker --version` and `docker compose version`
+
+2. **Clone or download this repository** and navigate to it:
+   ```powershell
+   cd C:\path\to\twitter_automation_n8n
+   ```
+
+3. **Run setup** (first time only):
+   ```powershell
+   bash setup.sh
+   ```
+   If `bash` is not available, you can use Git Bash or WSL. This creates `.env` and prints the admin password. Save the `ADMIN_PASSWORD` value.
+
+4. **Build and start the containers**:
+   ```powershell
+   docker compose up -d --build
+   ```
+
+5. **Access the applications**:
+   - Admin panel: http://localhost:8080
+   - n8n: http://localhost:5678 (first time, create an owner account)
+
+### Linux (Ubuntu/Debian)
+
+1. **Install Docker and Docker Compose** (if not already installed):
+   ```sh
+   # Install Docker
+   curl -fsSL https://get.docker.com -o get-docker.sh
+   sudo sh get-docker.sh
+
+   # Add your user to the docker group (log out and back in after this)
+   sudo usermod -aG docker $USER
+
+   # Verify installation
+   docker --version
+   docker compose version
+   ```
+
+2. **Install OpenSSL** (if not already installed):
+   ```sh
+   sudo apt update
+   sudo apt install openssl
+   ```
+
+3. **Clone or download this repository** and navigate to it:
+   ```sh
+   cd /path/to/twitter_automation_n8n
+   ```
+
+4. **Run setup** (first time only):
+   ```sh
+   ./setup.sh
+   ```
+   This creates `.env` and prints the admin password. Save the `ADMIN_PASSWORD` value.
+
+5. **Build and start the containers**:
+   ```sh
+   docker compose up -d --build
+   ```
+
+6. **Access the applications**:
+   - Admin panel: http://localhost:8080
+   - n8n: http://localhost:5678 (first time, create an owner account)
+
+### Linux (Fedora/CentOS/RHEL)
+
+1. **Install Docker and Docker Compose** (if not already installed):
+   ```sh
+   # Install Docker
+   sudo dnf -y install dnf-plugins-core
+   sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+   sudo dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+   # Start and enable Docker
+   sudo systemctl start docker
+   sudo systemctl enable docker
+
+   # Add your user to the docker group (log out and back in after this)
+   sudo usermod -aG docker $USER
+
+   # Verify installation
+   docker --version
+   docker compose version
+   ```
+
+2. **Install OpenSSL** (if not already installed):
+   ```sh
+   sudo dnf install openssl
+   ```
+
+3. **Clone or download this repository** and navigate to it:
+   ```sh
+   cd /path/to/twitter_automation_n8n
+   ```
+
+4. **Run setup** (first time only):
+   ```sh
+   ./setup.sh
+   ```
+   This creates `.env` and prints the admin password. Save the `ADMIN_PASSWORD` value.
+
+5. **Build and start the containers**:
+   ```sh
+   docker compose up -d --build
+   ```
+
+6. **Access the applications**:
+   - Admin panel: http://localhost:8080
+   - n8n: http://localhost:5678 (first time, create an owner account)
+
+### Container Overview
 
 Three containers start:
 
@@ -103,6 +246,30 @@ Three containers start:
 `web` and `worker` mount the same Docker volume (`data`) at `/data`. The panel never talks to the worker directly: it writes
 what you want (start, pause, stop) into the shared database and the worker obeys it within a few seconds.
 Restarting `web` does not interrupt running agents.
+
+### Common Commands
+
+```sh
+# View container logs
+docker compose logs -f
+
+# View logs for a specific service
+docker compose logs -f web
+docker compose logs -f worker
+docker compose logs -f n8n
+
+# Stop all containers
+docker compose down
+
+# Restart all containers
+docker compose restart
+
+# Rebuild after code changes
+docker compose up -d --build
+
+# Update environment variables after editing .env
+docker compose up -d
+```
 
 ---
 
@@ -149,8 +316,8 @@ After editing `.env`, apply it with `docker compose up -d`.
 
 ## 6. The admin panel
 
-The sidebar on the left switches between six pages. At the bottom it shows whether the master agent (the
-`worker` container) is online, and the Sign out button. The Approvals item shows a yellow counter with the number
+The navigation bar at the top switches between six pages. On the right it shows whether the master agent (the
+`worker` container) is online, and the Sign out button. The Approvals item shows a counter with the number
 of drafts waiting for approval.
 
 ### Dashboard
