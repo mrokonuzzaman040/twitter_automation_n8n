@@ -9,7 +9,7 @@ from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import config, db, llm, sheets
+from . import config, db, hooks, llm, sheets
 
 config.require()
 STATIC = Path(__file__).parent / "static"
@@ -19,8 +19,12 @@ app.add_middleware(SessionMiddleware, secret_key=config.session_secret(), same_s
 
 
 def require_login(request: Request):
-    if not request.session.get("auth"):
-        raise HTTPException(401, "Login required")
+    if request.session.get("auth"):
+        return
+    sent = request.headers.get("authorization", "")
+    if config.API_TOKEN and hmac.compare_digest(sent.encode(), f"Bearer {config.API_TOKEN}".encode()):
+        return
+    raise HTTPException(401, "Login required")
 
 
 api = APIRouter(prefix="/api", dependencies=[Depends(require_login)])
@@ -138,6 +142,8 @@ def edit_account(account_id: int, body: dict = Body(...)):
         bad("Another account already uses that platform and handle")
     fields["schedule_sheet_id"] = str(body.get("schedule_sheet_id", a["schedule_sheet_id"]) or "").strip()
     fields["tone"] = str(body.get("tone", a["tone"]) or "").strip()
+    if not str(body.get("target_profiles", "x")).strip():
+        fields["target_profiles"] = ""
     db.update_account(account_id, **fields)
     return {"ok": True}
 
@@ -243,7 +249,7 @@ def events(account_id: int = 0, limit: int = 200):
 # ---------- settings ----------
 
 PLAIN_SETTINGS = ["llm_provider", "llm_base_url", "llm_model", "master_sheet_id", "schedule_sheet_id",
-                  "sheet_sync_minutes", "auto_start_new"]
+                  "sheet_sync_minutes", "auto_start_new", "n8n_webhook_url", "n8n_events"]
 
 
 @api.get("/settings")
@@ -252,6 +258,9 @@ def get_settings():
     out["llm_provider"] = out["llm_provider"] or "nvidia"
     out["sheet_sync_minutes"] = out["sheet_sync_minutes"] or "5"
     out["auto_start_new"] = out["auto_start_new"] or "1"
+    out["n8n_webhook_url"] = out["n8n_webhook_url"] or hooks.DEFAULT_URL
+    out["n8n_events"] = out["n8n_events"] or "1"
+    out["api_token_set"] = bool(config.API_TOKEN)
     out["llm_api_key_set"] = bool(db.get_setting("llm_api_key"))
     out["google_service_account_email"] = sheets.service_account_email()
     out["presets"] = llm.PRESETS
@@ -290,6 +299,12 @@ def test_sheets():
         return {"ok": True, "reply": f"Master sheet readable: {len(sheets.read_master_accounts())} account rows"}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"[:400]}
+
+
+@api.post("/settings/test-n8n")
+def test_n8n():
+    ok, detail = hooks.send("test", None, {"message": "Test event from the Social Agents panel"})
+    return {"ok": ok, "reply": detail, "error": detail}
 
 
 app.include_router(api)

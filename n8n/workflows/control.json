@@ -1,0 +1,173 @@
+{
+  "id": "SocialAgentsCtrl",
+  "name": "Social Agents - Daily summary and control",
+  "active": false,
+  "nodes": [
+    {
+      "id": "c1",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "c2",
+      "name": "Every morning 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c3",
+      "name": "Get agent overview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SOCIAL_AGENTS_URL }}/api/overview",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SOCIAL_AGENTS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c4",
+      "name": "Build summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "summary",
+              "value": "={{ $json.accounts.length + ' accounts, ' + $json.accounts.filter(a => a.agent_status !== 'stopped').length + ' agents running, ' + $json.accounts.reduce((n, a) => n + (a.counts.pending_approval || 0), 0) + ' posts waiting for approval, ' + $json.accounts.reduce((n, a) => n + (a.counts.failed || 0), 0) + ' failed' + ($json.master.online ? '' : ' - MASTER AGENT OFFLINE') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c5",
+      "name": "Send summary - put Telegram, Slack or Email here",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "c6",
+      "name": "Example: start all agents (connect to use)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        520
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SOCIAL_AGENTS_URL }}/api/master/action",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SOCIAL_AGENTS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"action\": \"start_all\"}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Get agent overview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every morning 08:00": {
+      "main": [
+        [
+          {
+            "node": "Get agent overview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get agent overview": {
+      "main": [
+        [
+          {
+            "node": "Build summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build summary": {
+      "main": [
+        [
+          {
+            "node": "Send summary - put Telegram, Slack or Email here",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

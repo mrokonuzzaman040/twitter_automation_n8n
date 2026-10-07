@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from . import db, sheets
+from . import db, hooks, sheets
 
 MAX_SLOTS = 30
 
@@ -42,4 +42,6 @@ def schedule(account, posts, slots, run_id, ctl) -> int:
             ids.append(cur.lastrowid)
         saved = db.rows(c, f"SELECT * FROM posts WHERE id IN ({','.join('?' * len(ids))}) ORDER BY scheduled_at", *ids)
     sheets.safe_upsert(account, saved)
+    hooks.emit("posts_scheduled", account, {"needs_approval": status == "pending_approval", "posts": [
+        {k: p[k] for k in ("id", "text", "hashtags", "image_url", "scheduled_at", "status")} for p in saved]})
     return len(saved)

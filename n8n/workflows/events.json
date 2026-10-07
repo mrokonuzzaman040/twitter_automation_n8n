@@ -1,0 +1,302 @@
+{
+  "id": "SocialAgentsEvnt",
+  "name": "Social Agents - Events",
+  "active": true,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Event from Social Agents",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "social-agents-events",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social-agents",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Build message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "event",
+              "value": "={{ $json.body.event }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "message",
+              "value": "={{ (() => { const b = $json.body || {}; const d = b.data || {}; const a = b.account ? '@' + b.account.handle + ' (' + b.account.platform + ')' : 'Social Agents'; if (b.event === 'posts_scheduled') return a + ': ' + d.posts.length + ' new posts ' + (d.needs_approval ? 'are waiting for your approval' : 'were scheduled for auto-posting'); if (b.event === 'post_published') return a + ': published ' + d.url; if (b.event === 'post_failed') return a + ': post #' + d.id + ' failed - ' + d.error; if (b.event === 'cycle_failed') return a + ': research and content cycle failed - ' + d.error; return a + ': ' + (d.message || b.event); })() }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "account",
+              "value": "={{ $json.body.account }}",
+              "type": "object"
+            },
+            {
+              "id": "a4",
+              "name": "data",
+              "value": "={{ $json.body.data }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Which event?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "posts_scheduled",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "posts_scheduled",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Posts ready"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "post_published",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "post_published",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Post published"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "post_failed",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "post_failed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Post failed"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cycle_failed",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "cycle_failed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cycle failed"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "e0",
+      "name": "Posts ready - put Telegram, Slack or Email here",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        700,
+        60
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "e1",
+      "name": "Post published - put Telegram, Slack or Email here",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        700,
+        190
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "e2",
+      "name": "Post failed - put Telegram, Slack or Email here",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        700,
+        320
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "e3",
+      "name": "Cycle failed - put Telegram, Slack or Email here",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        700,
+        450
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "e4",
+      "name": "Other event",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        700,
+        580
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Event from Social Agents": {
+      "main": [
+        [
+          {
+            "node": "Build message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build message": {
+      "main": [
+        [
+          {
+            "node": "Which event?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Which event?": {
+      "main": [
+        [
+          {
+            "node": "Posts ready - put Telegram, Slack or Email here",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post published - put Telegram, Slack or Email here",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post failed - put Telegram, Slack or Email here",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cycle failed - put Telegram, Slack or Email here",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Other event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

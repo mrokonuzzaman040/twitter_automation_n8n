@@ -82,7 +82,8 @@ def run(account, ctl, run_id) -> dict:
     """Collect research for the account topic, store it, and return the brief {summary, angles[]}."""
     topic = account["topic"]
     seen, collected = set(), {}
-    for category, label, sources in _plan(topic):
+    from . import social  # imported here: social builds on this module's helpers
+    for category, label, sources in _plan(topic) + social.plan(account):
         ctl.checkpoint()
         ctl.task(f"Research: {label}")
         items = []
@@ -111,21 +112,35 @@ def run(account, ctl, run_id) -> dict:
     ctl.task("Research: writing brief")
     lines = []
     for category, items in collected.items():
-        for i in items[:8]:
-            lines.append(f"[{category}] {i['title']} | {i['summary'][:200]} | {i['url']}")
+        if category == "target_profiles":
+            # the best posts of every target, not just the first target's
+            picked = [i for src in dict.fromkeys(i["source"] for i in items)
+                      for i in sorted((x for x in items if x["source"] == src), key=lambda x: -x["score"])[:3]]
+        else:
+            picked = items[:8]
+        for i in picked:
+            lines.append(f"[{category}] {i['source']}: {i['title'][:240]} | {i['summary'][:200]} | {i['url']}")
     brief = llm.chat_json(
         "You are a social media research analyst. You turn raw findings into content angles.",
-        f"Topic: {topic}\n\nRaw findings from the last 7 days (category | title | detail | url):\n"
+        f"Topic: {topic}\nPlatform: {account['platform']}\n\n"
+        "Raw findings (category | source: title or post text | detail | url). "
+        "social_trending = top posts on the platform itself. target_profiles = recent posts of profiles this "
+        "account wants to learn from, with their engagement.\n"
         + ("\n".join(lines) or "(none found)") +
         "\n\nReturn a JSON object: {\"summary\": \"3-4 sentence overview of what is happening in this topic right now\", "
-        "\"angles\": [{\"category\": \"latest_news|b2b_offers|trending_topics|viral_posts|viral_content\", "
+        "\"target_insights\": \"what the target profiles and top platform posts are doing that earns engagement: "
+        "themes, hooks, formats, length. Empty string if there are no such findings\", "
+        "\"angles\": [{\"category\": \"latest_news|b2b_offers|trending_topics|viral_posts|viral_content|"
+        "social_trending|target_profiles\", "
         "\"title\": \"short angle name\", \"insight\": \"why this would make a strong post and the key fact to use\", "
         "\"url\": \"source url or empty\"}]}\n"
-        "Give 8-12 angles, covering every category that has findings. Only use facts present in the findings.",
+        "Give 8-12 angles, covering every category that has findings. Only use facts present in the findings. "
+        "Angles from target_profiles must be inspired by what works for them, never a copy of their posts.",
         temperature=0.4)
     if not isinstance(brief, dict):
         brief = {"summary": "", "angles": brief if isinstance(brief, list) else []}
     brief.setdefault("summary", "")
+    brief["target_insights"] = str(brief.get("target_insights") or "")
     brief["angles"] = [a for a in brief.get("angles") or [] if isinstance(a, dict)]
     with db.account(account["id"]) as c:
         c.execute("INSERT INTO briefs(run_id, brief, created_at) VALUES(?,?,?)", (run_id, json.dumps(brief), db.now()))

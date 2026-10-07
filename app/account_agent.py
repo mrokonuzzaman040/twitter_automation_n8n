@@ -4,7 +4,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
-from . import content, db, media, publisher, research, scheduler
+from . import content, db, hooks, media, publisher, research, scheduler
 
 RETRY_AFTER_FAILURE = timedelta(minutes=30)
 PUBLISH_EVERY = 30  # seconds
@@ -108,6 +108,7 @@ class AccountAgent(threading.Thread):
         except Exception as e:
             status, error, retry = "failed", str(e)[:500], RETRY_AFTER_FAILURE
             db.log_event(self.id, "agent", f"Cycle #{run_id} failed: {error}", "error")
+            hooks.emit("cycle_failed", a, {"run_id": run_id, "error": error})
         finally:
             with db.account(self.id) as c:
                 c.execute("UPDATE runs SET finished_at=?, status=?, error=? WHERE id=?", (db.now(), status, error, run_id))

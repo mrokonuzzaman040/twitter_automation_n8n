@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from . import config, db, sheets
+from . import config, db, hooks, sheets
 from .content import compose
 
 MISSED_AFTER = timedelta(hours=12)
@@ -99,9 +99,11 @@ def publish_due(account, ctl):
                 url = publish(account, post)
                 update = {"status": "posted", "posted_url": url, "posted_at": db.now(), "error": ""}
                 db.log_event(account["id"], "publisher", f"Posted #{post['id']} {url}")
+                hooks.emit("post_published", account, {"id": post["id"], "text": post["text"], "url": url})
             except Exception as e:
                 update = {"status": "failed", "error": str(e)[:500]}
                 db.log_event(account["id"], "publisher", f"Post #{post['id']} failed: {str(e)[:300]}", "error")
+                hooks.emit("post_failed", account, {"id": post["id"], "text": post["text"], "error": str(e)[:500]})
         with db.account(account["id"]) as c:
             c.execute(f"UPDATE posts SET {','.join(k + '=?' for k in update)} WHERE id=?", (*update.values(), post["id"]))
         changed.append({**post, **update})

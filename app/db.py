@@ -3,6 +3,7 @@
 control.db            - account registry, agent state, settings, event log (shared by web + worker)
 accounts/account_N.db - one database per account: its credentials, research, posts and runs
 """
+import re
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -13,7 +14,7 @@ from . import config, crypto
 
 SECRET_SETTINGS = {"llm_api_key", "google_service_account_json"}
 ACCOUNT_FIELDS = ["platform", "handle", "topic", "tone", "language", "post_times", "timezone",
-                  "cycle_hours", "post_mode", "schedule_sheet_id"]
+                  "cycle_hours", "post_mode", "schedule_sheet_id", "target_profiles"]
 PLATFORMS = ("twitter", "instagram")
 CREDENTIAL_FIELDS = {
     "twitter": ["api_key", "api_secret", "access_token", "access_token_secret"],
@@ -33,6 +34,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     cycle_hours INTEGER NOT NULL DEFAULT 24,
     post_mode TEXT NOT NULL DEFAULT 'approval',
     schedule_sheet_id TEXT NOT NULL DEFAULT '',
+    target_profiles TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT 'panel',
     desired_state TEXT NOT NULL DEFAULT 'stopped',
     agent_status TEXT NOT NULL DEFAULT 'stopped',
@@ -102,6 +104,10 @@ CREATE TABLE IF NOT EXISTS posts (
 );
 """
 
+# Applied to databases created by an earlier version; "duplicate column" means already applied.
+CONTROL_MIGRATIONS = ["ALTER TABLE accounts ADD COLUMN target_profiles TEXT NOT NULL DEFAULT ''"]
+MAX_TARGETS = 15
+
 _initialised = set()
 _init_lock = threading.Lock()
 
@@ -119,7 +125,7 @@ def to_utc_iso(value: str) -> str:
 
 
 @contextmanager
-def _conn(path, schema):
+def _conn(path, schema, migrations=()):
     c = sqlite3.connect(path, timeout=20)
     c.row_factory = sqlite3.Row
     try:
@@ -128,6 +134,11 @@ def _conn(path, schema):
             with _init_lock:
                 c.execute("PRAGMA journal_mode=WAL")
                 c.executescript(schema)
+                for sql in migrations:
+                    try:
+                        c.execute(sql)
+                    except sqlite3.OperationalError:
+                        pass
                 _initialised.add(key)
         yield c
         c.commit()
@@ -136,7 +147,7 @@ def _conn(path, schema):
 
 
 def control():
-    return _conn(config.DATA_DIR / "control.db", CONTROL_SCHEMA)
+    return _conn(config.DATA_DIR / "control.db", CONTROL_SCHEMA, CONTROL_MIGRATIONS)
 
 
 def account_path(account_id: int):
@@ -195,6 +206,8 @@ def normalize_account(data: dict, partial: bool = False) -> dict:
         out["platform"] = out["platform"].lower()
         if out["platform"] not in PLATFORMS:
             raise ValueError("Platform must be twitter or instagram")
+    if "target_profiles" in out:
+        out["target_profiles"] = "\n".join(f"{p}:{h}" for p, h in parse_targets(out["target_profiles"], out.get("platform", "twitter")))
     if "post_times" in out:
         out["post_times"] = ",".join(f"{h:02d}:{m:02d}" for h, m in parse_times(out["post_times"]))
     if "timezone" in out:
@@ -212,6 +225,26 @@ def normalize_account(data: dict, partial: bool = False) -> dict:
         if out["post_mode"] not in ("approval", "auto"):
             raise ValueError("post_mode must be approval or auto")
     return out
+
+
+def parse_targets(value: str, default_platform: str) -> list:
+    """Target profiles as [(platform, handle)]. Accepts handles, profile URLs, or 'instagram:handle'; one per line or comma."""
+    out, seen = [], set()
+    for raw in re.split(r"[,;\n]+", value or ""):
+        raw, platform = raw.strip(), default_platform
+        prefix = re.match(r"^(twitter|x|instagram|ig)\s*:\s*(?!//)(.+)$", raw, re.I)
+        if prefix:
+            platform = "instagram" if prefix.group(1).lower() in ("instagram", "ig") else "twitter"
+            raw = prefix.group(2)
+        elif "instagram.com/" in raw.lower():
+            platform = "instagram"
+        elif re.search(r"(?:^|[/.])(?:x|twitter)\.com/", raw.lower()):
+            platform = "twitter"
+        handle = re.sub(r"^(https?://)?(www\.)?[a-z]+\.com/", "", raw, flags=re.I).split("/")[0].split("?")[0].lstrip("@")
+        if re.fullmatch(r"[A-Za-z0-9_.]{1,40}", handle) and (platform, handle.lower()) not in seen:
+            seen.add((platform, handle.lower()))
+            out.append((platform, handle))
+    return out[:MAX_TARGETS]
 
 
 def parse_times(value: str):

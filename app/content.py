@@ -35,6 +35,8 @@ def generate(account, brief, count, ctl) -> list:
         f"Language: {account['language']}\nTone: {account['tone'] or 'confident, helpful, conversational'}\n"
         f"Format: {PLATFORM_RULES[account['platform']]}\n\n"
         f"Research summary: {brief.get('summary', '')}\n"
+        f"What is working on the platform and for target profiles (learn from the style, do not copy): "
+        f"{brief.get('target_insights') or 'no data'}\n"
         f"Angles:\n{json.dumps(brief.get('angles', []), ensure_ascii=False)}\n\n"
         f"Already posted recently (do not repeat these ideas):\n{json.dumps(recent, ensure_ascii=False)}\n\n"
         f"Write exactly {count} posts, each on a different angle, mixing the categories. "

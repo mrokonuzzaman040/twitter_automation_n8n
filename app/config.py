@@ -6,6 +6,8 @@ from pathlib import Path
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 MASTER_KEY = os.environ.get("MASTER_KEY", "")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+# Lets n8n (or any script) call the API with "Authorization: Bearer <token>" instead of a panel login.
+API_TOKEN = os.environ.get("API_TOKEN", "")
 LLM_CONCURRENCY = int(os.environ.get("LLM_CONCURRENCY", "3"))
 GRAPH_API_VERSION = os.environ.get("GRAPH_API_VERSION", "v23.0")
 
