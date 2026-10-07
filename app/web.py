@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import config, db, hooks, llm, sheets
@@ -16,6 +17,13 @@ STATIC = Path(__file__).parent / "static"
 
 app = FastAPI(title="Social Agents", docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(SessionMiddleware, secret_key=config.session_secret(), same_site="strict", max_age=7 * 86400)
+# Serves styles.css and common.js, shared by every page below.
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+@app.get("/favicon.ico")
+def favicon():
+    return Response(status_code=204)
 
 
 def require_login(request: Request):
