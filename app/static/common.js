@@ -50,6 +50,62 @@ function renderHeader(data) {
 // Every page calls this once on load: it checks the session, reveals #app (or #login on 401),
 // and keeps the header (master status, pending count) current. `onReady(data)` runs after the
 // first successful load, for the page's own content - do page setup there, not before boot().
+async function checkGlobalUpdate(){
+  try{
+    const v = await api('/version');
+    if(v.update_available){
+      showUpdatePopup(v);
+    }
+  }catch{}
+}
+
+function showUpdatePopup(v){
+  let dlg = document.getElementById('updatePopup');
+  if(!dlg){
+    dlg = document.createElement('dialog');
+    dlg.id = 'updatePopup';
+    dlg.className = 'update-popup';
+    dlg.innerHTML = `<form method="dialog">
+      <div class="popup-header">
+        <h3>New release available</h3>
+        <button type="button" class="close-btn" onclick="this.closest('dialog').close()">✕</button>
+      </div>
+      <div class="popup-body">
+        <p><strong>Current:</strong> ${esc(v.current_version || 'unknown')}<br>
+        <strong>Latest:</strong> ${esc(v.latest_version || 'unknown')}</p>
+        ${v.latest_release?.url ? `<p><a href="${esc(v.latest_release.url)}" target="_blank" rel="noopener">View release notes</a></p>`:''}
+      </div>
+      <div class="actions">
+        <button value="later" class="secondary">Remind later</button>
+        <button value="settings" class="primary">Go to Settings</button>
+        <button value="update" class="primary">Update now</button>
+      </div>
+    </form>`;
+    document.body.appendChild(dlg);
+    dlg.addEventListener('close', async () => {
+      const ret = dlg.returnValue;
+      if(ret === 'update'){
+        try {
+          await api('/update','POST');
+          toast('Update started. Containers will restart shortly.','success');
+          setTimeout(()=>location.reload(),3000);
+        } catch(e){ toast('Update failed: '+e.message,'error'); }
+      } else if(ret === 'settings'){
+        location.href = '/settings#update';
+      }
+    });
+  } else {
+    // refresh content
+    const body = dlg.querySelector('.popup-body');
+    if(body){
+      body.innerHTML = `<p><strong>Current:</strong> ${esc(v.current_version || 'unknown')}<br>
+      <strong>Latest:</strong> ${esc(v.latest_version || 'unknown')}</p>
+      ${v.latest_release?.url ? `<p><a href="${esc(v.latest_release.url)}" target="_blank" rel="noopener">View release notes</a></p>`:''}`;
+    }
+  }
+  dlg.showModal();
+}
+
 async function boot(onReady) {
   let data;
   try { data = await api('/overview'); }
@@ -61,6 +117,8 @@ async function boot(onReady) {
     try { await onReady(data); } catch (e) { toast(e.message || 'Could not load this page', 'error'); }
   }
   setInterval(() => api('/overview').then(d => { state.accounts = d.accounts; renderHeader(d); }).catch(() => {}), 10000);
+  // global update check once per session
+  checkGlobalUpdate();
 }
 
 $('loginForm').onsubmit = async e => {
@@ -69,6 +127,14 @@ $('loginForm').onsubmit = async e => {
   catch (err) { $('loginErr').textContent = err.message; }
 };
 $('logout').onclick = async () => { await api('/logout', 'POST'); showLogin(); };
+const logoutBtn = document.getElementById('logoutBtn');
+if (logoutBtn) {
+  logoutBtn.onclick = async (e) => {
+    e.preventDefault();
+    await api('/logout', 'POST');
+    showLogin();
+  };
+}
 
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
 
@@ -156,5 +222,41 @@ if (sidebarToggle && sidebar) {
     sidebar.classList.toggle('collapsed');
     sidebarToggle.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
   };
+}
+
+// Theme toggle
+const themeToggle = document.querySelector('.theme-toggle');
+if (themeToggle) {
+  // Load saved theme or prefer system preference
+  const savedTheme = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', initialTheme);
+
+  themeToggle.onclick = () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
+}
+
+// Profile dropdown
+const profileDropdown = document.querySelector('.profile-dropdown');
+const profileBtn = document.querySelector('.profile-btn');
+const profileMenu = document.querySelector('.profile-menu');
+
+if (profileBtn && profileMenu) {
+  profileBtn.onclick = (e) => {
+    e.stopPropagation();
+    profileMenu.classList.toggle('show');
+  };
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (profileDropdown && !profileDropdown.contains(e.target)) {
+      profileMenu.classList.remove('show');
+    }
+  });
 }
 
