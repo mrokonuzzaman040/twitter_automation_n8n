@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /Users/rokon-dev/Desktop/untitled folder 2/twitter_automation_n8n)",
+      "Read(//Users/rokon-dev/Desktop/**)",
+      "Bash(find . -type f -not -path './node_modules/*' -not -path './.git/*' | head -50)",
+      "Bash(grep -n -A5 \"volumes\" docker-compose.yml | head -20; curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/styles.css)",
+      "Bash(docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | grep -i -E 'web|panel|8080'; lsof -nP -iTCP:8080 -sTCP:LISTEN 2>/dev/null | tail -3)",
+      "Bash(docker compose up -d --build web 2>&1 | tail -5)",
+      "Bash(curl -s http://localhost:8080/static/styles.css | grep -E \"^  font: |topbar h1\" -A1 | head -6)",
+      "Bash(grep -n -E \"def rows|def one|def control|\\\\\\\\?|replace\" app/db.py | head -30)",
+      "Bash(grep -n -B2 -A8 \"def require\\\\|Depends\\\\|Authorization\\\\|API_TOKEN\" app/web.py | head -40)",
+      "Bash(python3 -m py_compile app/web.py && docker compose up -d --build web 2>&1 | tail -2)",
+      "Bash(TOKEN=$\\(grep '^API_TOKEN' .env | cut -d= -f2 | tr -d '\"'\\); sleep 2; curl -s -H \"Authorization: Bearer $TOKEN\" \"http://localhost:8080/api/events?limit=2\" | head -c 600; echo; curl -s -H \"Authorization: Bearer $TOKEN\" \"http://localhost:8080/api/events?level=error&limit=1&q=post\" | head -c 400)",
+      "Bash(TOKEN=$\\(grep '^API_TOKEN' .env | cut -d= -f2 | tr -d '\"'\\); curl -s -H \"Authorization: Bearer $TOKEN\" \"http://localhost:8080/api/events?limit=2&offset=2\" | python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\([r['id'] for r in d['rows']], d['total']\\)\"; curl -s -H \"Authorization: Bearer $TOKEN\" \"http://localhost:8080/api/events?q=started&limit=500\" | python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d['total'], len\\(d['rows']\\)\\)\"; curl -s -H \"Authorization: Bearer $TOKEN\" \"http://localhost:8080/api/events?agent=panel\" | python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d['total']\\)\")",
+      "Bash(sed -n '/<script>/,/<\\\\/script>/p' app/static/logs.html | sed '1d;$d' > /tmp/logs_check.js && node --check /tmp/logs_check.js && echo JS_OK && curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8080/logs)",
+      "Bash(curl -s http://localhost:8080/logs | grep -c \"logSearch\\\\|logPageSize\\\\|logPrev\")"
+    ]
+  }
+}

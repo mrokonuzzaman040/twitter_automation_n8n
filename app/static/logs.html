@@ -21,17 +21,18 @@
 <div id="app" class="hidden">
   <button class="menu-toggle">☰</button>
   <aside>
+    <button class="sidebar-toggle">◀</button>
     <div class="brand">
       <div class="logo">S</div>
       <span>Social Agents</span>
     </div>
     <nav>
-      <a href="/">Dashboard</a>
-      <a href="/approvals">Approvals <span id="pendingCount" class="badge hidden"></span></a>
-      <a href="/content">Content</a>
-      <a href="/research">Research</a>
-      <a href="/logs" class="active">Logs</a>
-      <a href="/settings">Settings</a>
+      <a href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="label">Dashboard</span></a>
+      <a href="/approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg><span class="label">Approvals</span> <span id="pendingCount" class="badge hidden"></span></a>
+      <a href="/content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span class="label">Content</span></a>
+      <a href="/research"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="label">Research</span></a>
+      <a href="/logs" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><span class="label">Logs</span></a>
+      <a href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg><span class="label">Settings</span></a>
     </nav>
     <div class="side-foot">
       <span id="masterBadge" class="badge">…</span>
@@ -49,34 +50,87 @@
     <main>
 <div class="card row">
   <select id="logAccount" style="width:auto"></select>
+  <select id="logLevel" style="width:auto"><option value="">All levels</option></select>
+  <select id="logAgent" style="width:auto"><option value="">All agents</option></select>
+  <input id="logSearch" placeholder="Search messages…" style="flex:1;min-width:160px">
+  <select id="logPageSize" style="width:auto" title="Rows per page">
+    <option value="25">25 / page</option>
+    <option value="50" selected>50 / page</option>
+    <option value="100">100 / page</option>
+    <option value="250">250 / page</option>
+  </select>
   <button id="refreshLogs">Refresh</button>
 </div>
 <div class="card tablewrap">
   <table><thead><tr><th>Time</th><th>Account</th><th>Agent</th><th>Message</th></tr></thead><tbody id="logRows"></tbody></table>
 </div>
+<div class="card row" style="justify-content:space-between">
+  <span class="small muted" id="logInfo"></span>
+  <div class="row">
+    <button id="logPrev">‹ Prev</button>
+    <span class="small" id="logPageLabel">Page 1</span>
+    <button id="logNext">Next ›</button>
+  </div>
+</div>
     </main>
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toastStack" class="toast-stack"></div>
 
 <script src="/static/common.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-async function loadLogs() {
-  const id = $('logAccount').value || 0;
-  const rows = await api(`/events?account_id=${id}`);
-  const name = e => e.handle ? '@' + e.handle : (state.accounts.find(a => a.id == e.account_id) || {}).handle || (e.account_id ? '#' + e.account_id : 'system');
-  $('logRows').innerHTML = rows.map(e => `<tr><td class="small muted" style="white-space:nowrap">${when(e.ts)}</td><td class="small">${esc(name(e))}</td>
-    <td>${badge(e.level === 'info' ? '' : e.level, e.agent)}</td><td class="pre">${esc(e.message)}</td></tr>`).join('')
-    || '<tr><td colspan="4" class="muted">No events yet.</td></tr>';
+let logOffset = 0, logTotal = 0, logTimer = null;
+
+function fillSelect(id, values, allLabel) {
+  const sel = $(id), cur = sel.value;
+  sel.innerHTML = `<option value="">${allLabel}</option>` + values.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  sel.value = values.includes(cur) ? cur : '';
 }
 
-$('logAccount').onchange = $('refreshLogs').onclick = loadLogs;
+async function loadLogs() {
+  const limit = +$('logPageSize').value;
+  const p = new URLSearchParams({
+    account_id: $('logAccount').value || 0,
+    level: $('logLevel').value,
+    agent: $('logAgent').value,
+    q: $('logSearch').value.trim(),
+    limit, offset: logOffset,
+  });
+  const data = await api(`/events?${p}`);
+  logTotal = data.total;
+  fillSelect('logLevel', data.levels, 'All levels');
+  fillSelect('logAgent', data.agents, 'All agents');
+
+  const name = e => e.handle ? '@' + e.handle : (state.accounts.find(a => a.id == e.account_id) || {}).handle || (e.account_id ? '#' + e.account_id : 'system');
+  $('logRows').innerHTML = data.rows.map(e => `<tr><td class="small muted" style="white-space:nowrap">${when(e.ts)}</td><td class="small">${esc(name(e))}</td>
+    <td>${badge(e.level === 'info' ? '' : e.level, e.agent)}</td><td class="pre">${esc(e.message)}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No events match these filters.</td></tr>';
+
+  const from = data.rows.length ? logOffset + 1 : 0;
+  const to = logOffset + data.rows.length;
+  $('logInfo').textContent = `Showing ${from}–${to} of ${logTotal} events`;
+  $('logPageLabel').textContent = `Page ${Math.floor(logOffset / limit) + 1} of ${Math.max(1, Math.ceil(logTotal / limit))}`;
+  $('logPrev').disabled = logOffset <= 0;
+  $('logNext').disabled = to >= logTotal;
+}
+
+function resetAndLoad() { logOffset = 0; loadLogs(); }
+function gotoPage(delta) {
+  const limit = +$('logPageSize').value;
+  logOffset = Math.max(0, Math.min(logOffset + delta * limit, Math.max(0, logTotal - limit)));
+  loadLogs();
+}
+
+['logAccount', 'logLevel', 'logAgent', 'logPageSize'].forEach(id => $(id).onchange = resetAndLoad);
+$('logSearch').oninput = () => { clearTimeout(logTimer); logTimer = setTimeout(resetAndLoad, 400); };
+$('refreshLogs').onclick = loadLogs;
+$('logPrev').onclick = () => gotoPage(-1);
+$('logNext').onclick = () => gotoPage(1);
 
 boot(data => {
-  const sel = $('logAccount');
-  sel.innerHTML = '<option value="0">All accounts</option>' + data.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
+  $('logAccount').innerHTML = '<option value="0">All accounts</option>' + data.accounts.map(a => `<option value="${a.id}">@${esc(a.handle)} (${esc(a.platform)})</option>`).join('');
   loadLogs();
 });
 });

@@ -21,17 +21,18 @@
 <div id="app" class="hidden">
   <button class="menu-toggle">☰</button>
   <aside>
+    <button class="sidebar-toggle">◀</button>
     <div class="brand">
       <div class="logo">S</div>
       <span>Social Agents</span>
     </div>
     <nav>
-      <a href="/" class="active">Dashboard</a>
-      <a href="/approvals">Approvals <span id="pendingCount" class="badge hidden"></span></a>
-      <a href="/content">Content</a>
-      <a href="/research">Research</a>
-      <a href="/logs">Logs</a>
-      <a href="/settings">Settings</a>
+      <a href="/" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="label">Dashboard</span></a>
+      <a href="/approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg><span class="label">Approvals</span> <span id="pendingCount" class="badge hidden"></span></a>
+      <a href="/content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span class="label">Content</span></a>
+      <a href="/research"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="label">Research</span></a>
+      <a href="/logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><span class="label">Logs</span></a>
+      <a href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg><span class="label">Settings</span></a>
     </nav>
     <div class="side-foot">
       <span id="masterBadge" class="badge">…</span>
@@ -44,6 +45,10 @@
       <div>
         <h1 id="pageTitle">Dashboard</h1>
         <p id="pageSub">Every account agent, its status and controls</p>
+      </div>
+      <div class="status-indicator">
+        <span class="status-dot" id="n8nStatusDot"></span>
+        <span class="status-text">n8n</span>
       </div>
     </div>
     <main>
@@ -59,7 +64,7 @@
     <button data-master="resume_all">Resume all</button>
     <button data-master="stop_all" class="danger">Stop all</button>
     <button data-master="sync_sheet">Sync sheet now</button>
-    <button class="primary" id="addAccount">Add account</button>
+    <a href="/add-account" class="button primary" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;background:var(--accent);color:#fff;border:1px solid var(--accent);">Add account</a>
   </div>
 </div>
 <div class="card tablewrap">
@@ -68,53 +73,6 @@
     <tbody id="accountRows"></tbody>
   </table>
 </div>
-
-<dialog id="accountDlg">
-  <h3 id="accountDlgTitle">Add account</h3>
-  <div class="grid">
-    <div><label>Platform</label><select id="a_platform"><option value="twitter">X / Twitter</option><option value="instagram">Instagram</option></select></div>
-    <div><label>Handle</label><input id="a_handle" placeholder="@username"></div>
-  </div>
-  <label>Topic</label><input id="a_topic" placeholder="e.g. AI tools for small businesses">
-  <div class="grid">
-    <div><label>Tone (optional)</label><input id="a_tone" placeholder="e.g. witty, expert"></div>
-    <div><label>Language</label><input id="a_language" value="English"></div>
-    <div>
-      <label>Post times</label>
-      <div style="display:flex;gap:6px;align-items:center">
-        <input id="a_post_times" value="09:00,13:00,18:00" style="flex:1">
-        <select id="a_post_times_picker">
-          <option value="06:00">06:00</option>
-          <option value="07:00">07:00</option>
-          <option value="08:00">08:00</option>
-          <option value="09:00">09:00</option>
-          <option value="10:00">10:00</option>
-          <option value="11:00">11:00</option>
-          <option value="12:00">12:00</option>
-          <option value="13:00">13:00</option>
-          <option value="14:00">14:00</option>
-          <option value="15:00">15:00</option>
-          <option value="16:00">16:00</option>
-          <option value="17:00">17:00</option>
-          <option value="18:00">18:00</option>
-          <option value="19:00">19:00</option>
-          <option value="20:00">20:00</option>
-          <option value="21:00">21:00</option>
-          <option value="22:00">22:00</option>
-        </select>
-        <button type="button" id="a_post_times_add" class="btn">Add</button>
-      </div>
-      <div class="small muted">Pick a time and Add. Duplicates ignored.</div>
-    </div>
-    <div><label>Timezone</label><input id="a_timezone" value="UTC" placeholder="Asia/Dhaka"></div>
-    <div><label>Research + create every (hours)</label><input id="a_cycle_hours" type="number" min="1" max="168" value="24"></div>
-  </div>
-  <label>Target profiles to research (one per line or comma separated: handle, profile link, or instagram:handle)</label>
-  <textarea id="a_target_profiles" style="min-height:70px" placeholder="@competitor1&#10;https://x.com/competitor2&#10;instagram:brandname"></textarea>
-  <label>Own schedule sheet (optional, overrides the one in Settings)</label><input id="a_schedule_sheet_id">
-  <div id="accountErr" class="err small"></div>
-  <div class="actions"><button data-close>Cancel</button><button class="primary" id="saveAccount">Save</button></div>
-</dialog>
 
 <dialog id="credDlg">
   <h3>Credentials</h3>
@@ -127,12 +85,12 @@
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toastStack" class="toast-stack"></div>
 
 <script src="/static/common.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-const A_FIELDS = ['platform', 'handle', 'topic', 'tone', 'language', 'post_times', 'timezone', 'cycle_hours', 'schedule_sheet_id', 'target_profiles'];
+const A_FIELDS = ['platform', 'handle', 'topic', 'tone', 'language', 'post_times', 'timezone', 'cycle_hours', 'schedule_sheet_id', 'target_profiles', 'llm_model'];
 
 function controls(a) {
   const b = (action, label, cls = '') => `<button class="${cls}" data-action="${action}" data-id="${a.id}">${label}</button>`;
@@ -141,7 +99,7 @@ function controls(a) {
   if (a.desired_state === 'running') out += b('pause', 'Pause') + b('run_now', 'Run now');
   if (a.desired_state === 'paused') out += b('resume', 'Resume', 'primary');
   if (a.desired_state !== 'stopped') out += b('stop', 'Stop', 'danger');
-  return out + b('edit', 'Edit') + b('creds', a.has_credentials ? 'Keys ✓' : 'Add keys') + b('delete', 'Delete', 'danger');
+  return out + b('creds', a.has_credentials ? 'Keys ✓' : 'Add keys') + b('delete', 'Delete', 'danger');
 }
 
 function agentCell(a, online) {
@@ -178,46 +136,14 @@ async function refresh() {
     return `<tr>
       <td><b>@${esc(a.handle)}</b><div class="small muted">${esc(a.platform)} · ${esc(a.source)}</div></td>
       <td>${esc(a.topic)}<div class="small muted">${esc(a.post_times)} ${esc(a.timezone)}</div>
-          <div class="small muted">${a.target_profiles ? a.target_profiles.split('\n').length + ' target profiles' : 'no target profiles'}</div></td>
+          <div class="small muted">${a.target_profiles ? a.target_profiles.split('\n').length + ' target profiles' : 'no target profiles'}</div>
+          <div class="small muted">${a.llm_model ? 'Model: ' + esc(a.llm_model) : 'Model: global default'}</div></td>
       <td>${agentCell(a, m.online)}</td>
       <td class="small nw">last ${when(a.last_cycle_at)}<br>next ${a.desired_state === 'running' ? when(a.next_cycle_at) : '—'}</td>
       <td class="small nw">${n.draft || 0} drafts<br>${n.scheduled || 0} approved<br>${n.posted || 0} posted${n.failed ? `<br><span class="err">${n.failed} failed</span>` : ''}</td>
       <td><div class="row">${controls(a)}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="muted">No accounts yet. Add one here, or connect your master Google Sheet in <a href="/settings">Settings</a>.</td></tr>';
 }
-
-function openAccount(a) {
-  state.editing = a ? a.id : null;
-  $('accountDlgTitle').textContent = a ? `Edit @${a.handle}` : 'Add account';
-  const defaults = { platform: 'twitter', language: 'English', post_times: '09:00,13:00,18:00', cycle_hours: 24,
-                     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' };
-  A_FIELDS.forEach(f => $('a_' + f).value = (a ? a[f] : defaults[f]) ?? '');
-  $('accountErr').textContent = '';
-  $('accountDlg').showModal();
-}
-
-$('a_post_times_add').onclick = () => {
-  const input = $('a_post_times');
-  const picker = $('a_post_times_picker');
-  const val = picker.value;
-  if (!val) return;
-  let times = input.value.split(',').map(s=>s.trim()).filter(Boolean);
-  if (!times.includes(val)) {
-    times.push(val);
-    times.sort((a,b)=>a.localeCompare(b));
-    input.value = times.join(',');
-  }
-};
-
-$('addAccount').onclick = () => openAccount(null);
-
-$('saveAccount').onclick = async () => {
-  const body = Object.fromEntries(A_FIELDS.map(f => [f, $('a_' + f).value]));
-  try {
-    if (state.editing) await api(`/accounts/${state.editing}`, 'PUT', body); else await api('/accounts', 'POST', body);
-    $('accountDlg').close(); refresh();
-  } catch (err) { $('accountErr').textContent = err.message; }
-};
 
 async function openCreds(a) {
   state.credFor = a.id;
@@ -230,8 +156,8 @@ async function openCreds(a) {
 
 $('saveCreds').onclick = async () => {
   const body = {}; document.querySelectorAll('[data-cred]').forEach(i => { if (i.value.trim()) body[i.dataset.cred] = i.value; });
-  try { await api(`/accounts/${state.credFor}/credentials`, 'PUT', body); $('credDlg').close(); toast('Credentials saved'); refresh(); }
-  catch (err) { toast(err.message); }
+  try { await api(`/accounts/${state.credFor}/credentials`, 'PUT', body); $('credDlg').close(); toast('Credentials saved', 'success'); refresh(); }
+  catch (err) { toast(err.message, 'error'); }
 };
 
 $('clearCreds').onclick = async () => {
@@ -243,24 +169,35 @@ $('accountRows').onclick = async e => {
   const { action, id } = e.target.dataset; if (!action) return;
   const a = state.accounts.find(x => x.id == id);
   try {
-    if (action === 'edit') return openAccount(a);
     if (action === 'creds') return openCreds(a);
     if (action === 'delete') {
       if (!confirm(`Delete @${a.handle} and its database (research, posts, credentials)? This cannot be undone.`)) return;
       await api(`/accounts/${id}`, 'DELETE');
     } else await api(`/accounts/${id}/action`, 'POST', { action });
     refresh();
-  } catch (err) { toast(err.message); }
+  } catch (err) { toast(err.message, 'error'); }
 };
 
 document.querySelectorAll('[data-master]').forEach(b => b.onclick = async () => {
   const action = b.dataset.master;
   if (action === 'stop_all' && !confirm('Stop every agent?')) return;
-  try { await api('/master/action', 'POST', { action }); toast(action === 'sync_sheet' ? 'Sync requested' : 'Done'); refresh(); }
-  catch (err) { toast(err.message); }
+  try { await api('/master/action', 'POST', { action }); toast(action === 'sync_sheet' ? 'Sync requested' : 'Done', 'success'); refresh(); }
+  catch (err) { toast(err.message, 'error'); }
 });
 
+async function checkN8nStatus() {
+  const dot = $('n8nStatusDot');
+  try {
+    const response = await api('/n8n-status');
+    dot.className = response.online ? 'status-dot online' : 'status-dot offline';
+  } catch (err) {
+    dot.className = 'status-dot offline';
+  }
+}
+
 boot(refresh);
+checkN8nStatus();
+setInterval(checkN8nStatus, 10000);
 setInterval(() => { if (!$('app').classList.contains('hidden') && !document.querySelector('dialog[open]')) refresh(); }, 5000);
 });
 </script>

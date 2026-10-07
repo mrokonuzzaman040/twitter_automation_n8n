@@ -21,17 +21,18 @@
 <div id="app" class="hidden">
   <button class="menu-toggle">☰</button>
   <aside>
+    <button class="sidebar-toggle">◀</button>
     <div class="brand">
       <div class="logo">S</div>
       <span>Social Agents</span>
     </div>
     <nav>
-      <a href="/">Dashboard</a>
-      <a href="/approvals">Approvals <span id="pendingCount" class="badge hidden"></span></a>
-      <a href="/content">Content</a>
-      <a href="/research">Research</a>
-      <a href="/logs">Logs</a>
-      <a href="/settings" class="active">Settings</a>
+      <a href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="label">Dashboard</span></a>
+      <a href="/approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg><span class="label">Approvals</span> <span id="pendingCount" class="badge hidden"></span></a>
+      <a href="/content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span class="label">Content</span></a>
+      <a href="/research"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="label">Research</span></a>
+      <a href="/logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><span class="label">Logs</span></a>
+      <a href="/settings" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg><span class="label">Settings</span></a>
     </nav>
     <div class="side-foot">
       <span id="masterBadge" class="badge">…</span>
@@ -47,6 +48,15 @@
       </div>
     </div>
     <main>
+<div id="updateCard" class="card hidden">
+  <h2>Updates</h2>
+  <div id="updateInfo" class="small muted"></div>
+  <div class="row" style="margin-top:8px">
+    <button class="primary" id="checkUpdateBtn">Check for updates</button>
+    <button id="updateNowBtn">Update now</button>
+    <span id="updateStatus" class="small"></span>
+  </div>
+</div>
 <div class="card">
   <h2>AI provider</h2>
   <div class="grid">
@@ -61,12 +71,16 @@
     <div><label>Base URL (blank = provider default)</label><input id="s_llm_base_url"></div>
   </div>
   <div class="small muted" id="effective" style="margin-top:8px"></div>
+  <div class="row" style="margin-top:10px">
+    <button class="primary" id="saveAi">Save AI provider</button>
+    <span id="aiSaveStatus" class="small muted"></span>
+  </div>
 </div>
 <div class="card">
   <h2>AI usage</h2>
   <div class="small muted">Tokens and response time of every call your agents make to the AI provider.</div>
   <div class="stats" id="usageToday" style="margin:10px 0 0"></div>
-  <div class="tablewrap" style="margin-top:10px">
+  <div class="tablewrap scrollable" id="usageTableWrap" style="margin-top:10px">
     <table>
       <thead><tr><th>Time</th><th>Model</th><th>Tokens in/out</th><th>Time taken</th><th>Status</th></tr></thead>
       <tbody id="usageRows"></tbody>
@@ -90,6 +104,11 @@
     <div><label>New accounts from the sheet</label>
       <select id="s_auto_start_new"><option value="1">Start their agent automatically</option><option value="0">Add as stopped</option></select></div>
   </div>
+  <div class="row" style="margin-top:10px">
+    <button class="primary" id="saveSheets">Save Google Sheets</button>
+    <button id="testSheets" style="margin-left:8px">Test Google Sheets</button>
+    <span id="sheetsSaveStatus" class="small muted"></span>
+  </div>
 </div>
 <div class="card">
   <h2>n8n</h2>
@@ -100,24 +119,39 @@
     <div><label>n8n webhook URL</label><input id="s_n8n_webhook_url"></div>
     <div><label>Send events to n8n</label><select id="s_n8n_events"><option value="1">On</option><option value="0">Off</option></select></div>
   </div>
+  <div class="row" style="margin-top:10px">
+    <button class="primary" id="saveN8n">Save n8n</button>
+    <button id="testN8n" style="margin-left:8px">Send test event to n8n</button>
+    <span id="n8nSaveStatus" class="small muted"></span>
+  </div>
 </div>
-<div class="row">
-  <button class="primary" id="saveSettings">Save settings</button>
-  <button id="testLlm">Test AI provider</button>
-  <button id="testSheets">Test Google Sheets</button>
-  <button id="testN8n">Send test event to n8n</button>
-  <span id="testResult" class="small"></span>
+<div class="card">
+  <h2>Telegram</h2>
+  <div class="small muted">Drafts are sent here with Approve buttons, and you get notified when a post is published or fails.
+    n8n reads these from this panel, so saving here is all that's needed - no .env edit or restart.</div>
+  <div class="grid" style="margin-top:10px">
+    <div><label>Bot token <span id="tgState"></span></label><input id="s_telegram_bot_token" type="password" placeholder="leave blank to keep current" autocomplete="off"></div>
+    <div><label>Chat id</label><input id="s_telegram_chat_id" placeholder="e.g. 123456789"></div>
+    <div><label>API URL (blank = api.telegram.org)</label><input id="s_telegram_api_url" placeholder="https://api.telegram.org"></div>
+  </div>
+  <div class="small muted" style="margin-top:8px">Create a bot with <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">@BotFather</a>,
+    press Start on it, then get your chat id from <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer">@userinfobot</a>.</div>
+  <div class="row" style="margin-top:10px">
+    <button class="primary" id="saveTelegram">Save Telegram</button>
+    <button id="testTelegram" style="margin-left:8px">Send test Telegram message</button>
+    <span id="tgSaveStatus" class="small muted"></span>
+  </div>
 </div>
     </main>
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toastStack" class="toast-stack"></div>
 
 <script src="/static/common.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-const S_FIELDS = ['llm_provider', 'llm_base_url', 'master_sheet_id', 'schedule_sheet_id', 'sheet_sync_minutes', 'auto_start_new', 'n8n_webhook_url', 'n8n_events'];
+const S_FIELDS = ['llm_provider', 'llm_base_url', 'master_sheet_id', 'schedule_sheet_id', 'sheet_sync_minutes', 'auto_start_new', 'n8n_webhook_url', 'n8n_events', 'telegram_chat_id', 'telegram_api_url'];
 let savedModel = '';
 
 async function loadSettings() {
@@ -132,73 +166,77 @@ async function loadSettings() {
   $('s_sa_private_key').value = '';
   $('s_sa_file').value = '';
   $('tokenState').textContent = s.api_token_set ? 'API token is set (API_TOKEN in .env).' : 'no API_TOKEN in .env, so API access from n8n is off.';
+  $('tgState').innerHTML = s.telegram_bot_token_set ? '<span class="badge posted">saved</span>' : '<span class="badge warn">not set</span>';
+  $('s_telegram_bot_token').value = '';
   savedModel = s.llm_model || '';
   await loadModels();
 }
 
 async function loadModels(force) {
-  const sel = $('s_llm_model');
-  sel.innerHTML = '<option value="">Loading models…</option>';
-  sel.disabled = true;
   $('modelHint').textContent = '';
-  try {
-    const q = new URLSearchParams({ provider: $('s_llm_provider').value, base_url: $('s_llm_base_url').value.trim(), force: force ? '1' : '0' });
-    const r = await api('/settings/models?' + q.toString());
-    sel.innerHTML = '';
-    for (const m of r.models) {
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = m.id + (m.billing ? ' — ' + m.billing : '') + (m.disabled ? ' (unavailable - last call failed)' : '');
-      opt.disabled = !!m.disabled;
-      sel.appendChild(opt);
-    }
-    const custom = document.createElement('option');
-    custom.value = '__custom__';
-    custom.textContent = 'Other (type model id manually)…';
-    sel.appendChild(custom);
-
-    if (savedModel && [...sel.options].some(o => o.value === savedModel)) {
-      sel.value = savedModel;
-      $('s_llm_model_custom').classList.add('hidden');
-    } else if (savedModel) {
-      sel.value = '__custom__';
-      $('s_llm_model_custom').value = savedModel;
-      $('s_llm_model_custom').classList.remove('hidden');
-    } else if (r.models.length) {
-      sel.value = r.models[0].id;
-    }
-    $('modelHint').textContent = r.error || `${r.models.length} model${r.models.length === 1 ? '' : 's'}` +
-      (r.cached ? ' (cached - press ↻ refresh for the latest)' : '');
-  } catch (err) {
-    sel.innerHTML = '<option value="">Could not load models</option>';
-    $('modelHint').textContent = err.message;
-  }
-  sel.disabled = false;
+  const r = await loadModelOptions('s_llm_model', 's_llm_model_custom', savedModel,
+    { provider: $('s_llm_provider').value, baseUrl: $('s_llm_base_url').value.trim(), force });
+  $('modelHint').textContent = r.error || `${r.models.length} model${r.models.length === 1 ? '' : 's'}` +
+    (r.cached ? ' (cached - press ↻ refresh for the latest)' : '');
 }
 
-async function loadUsage() {
-  const u = await api('/settings/usage');
-  const t = u.today;
-  $('usageToday').innerHTML = [[t.calls, 'Calls (24h)'], [t.tokens, 'Tokens (24h)'],
-    [Math.round(t.avg_ms) + ' ms', 'Avg response time'], [t.errors, 'Errors (24h)']]
-    .map(([n, label]) => `<div class="stat"><b>${n}</b><span>${label}</span></div>`).join('');
-  $('usageRows').innerHTML = u.recent.map(r => `<tr>
-    <td class="small nw">${when(r.ts)}</td>
-    <td class="small">${esc(r.model)}</td>
-    <td class="small nw">${r.prompt_tokens}/${r.completion_tokens}</td>
-    <td class="small nw">${r.duration_ms} ms</td>
-    <td>${r.ok ? badge('posted', 'ok') : badge('failed', 'failed' + (r.error_kind ? ' (' + esc(r.error_kind) + ')' : ''))}</td>
-  </tr>`).join('') || '<tr><td colspan="5" class="muted">No AI calls yet.</td></tr>';
+let usageOffset = 0;
+let usageData = [];
+let isLoadingUsage = false;
+let hasMoreUsage = true;
+const USAGE_PAGE_SIZE = 5;
+
+async function loadUsage(append = false) {
+  if (isLoadingUsage || !hasMoreUsage) return;
+  isLoadingUsage = true;
+
+  try {
+    const u = await api(`/settings/usage?offset=${usageOffset}&limit=${USAGE_PAGE_SIZE}`);
+    const t = u.today;
+
+    if (!append) {
+      $('usageToday').innerHTML = [[t.calls, 'Calls (24h)'], [t.tokens, 'Tokens (24h)'],
+        [Math.round(t.avg_ms) + ' ms', 'Avg response time'], [t.errors, 'Errors (24h)']]
+        .map(([n, label]) => `<div class="stat"><b>${n}</b><span>${label}</span></div>`).join('');
+      $('usageRows').innerHTML = '';
+      usageData = [];
+    }
+
+    if (u.recent && u.recent.length > 0) {
+      usageData = usageData.concat(u.recent);
+      const newRows = u.recent.map(r => `<tr>
+        <td class="small nw">${when(r.ts)}</td>
+        <td class="small">${esc(r.model)}</td>
+        <td class="small nw">${r.prompt_tokens}/${r.completion_tokens}</td>
+        <td class="small nw">${r.duration_ms} ms</td>
+        <td>${r.ok ? badge('posted', 'ok') : badge('failed', 'failed' + (r.error_kind ? ' (' + esc(r.error_kind) + ')' : ''))}</td>
+      </tr>`).join('');
+
+      if (append) {
+        $('usageRows').innerHTML += newRows;
+      } else {
+        $('usageRows').innerHTML = newRows || '<tr><td colspan="5" class="muted">No AI calls yet.</td></tr>';
+      }
+
+      usageOffset += u.recent.length;
+      hasMoreUsage = u.recent.length === USAGE_PAGE_SIZE;
+    } else {
+      hasMoreUsage = false;
+      if (!append && usageData.length === 0) {
+        $('usageRows').innerHTML = '<tr><td colspan="5" class="muted">No AI calls yet.</td></tr>';
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load usage:', err);
+  } finally {
+    isLoadingUsage = false;
+  }
 }
 
 $('s_llm_provider').onchange = () => { savedModel = ''; loadModels(); };
 $('s_llm_base_url').addEventListener('change', () => loadModels());
 $('refreshModels').onclick = () => loadModels(true);
-$('s_llm_model').onchange = () => {
-  const custom = $('s_llm_model').value === '__custom__';
-  $('s_llm_model_custom').classList.toggle('hidden', !custom);
-  if (custom) $('s_llm_model_custom').focus();
-};
+wireModelCustomToggle('s_llm_model', 's_llm_model_custom');
 
 $('s_sa_file').addEventListener('change', async e => {
   const file = e.target.files?.[0];
@@ -210,53 +248,208 @@ $('s_sa_file').addEventListener('change', async e => {
     if (obj && obj.client_email && obj.private_key) {
       $('s_sa_email').value = obj.client_email;
       $('s_sa_private_key').value = obj.private_key;
-      toast('Service account JSON loaded from file');
+      toast('Service account JSON loaded from file', 'success');
     } else {
       $('s_google_service_account_json').value = text.trim();
-      toast('JSON file loaded');
+      toast('JSON file loaded', 'success');
     }
-  } catch (err) { toast('Could not read file'); }
+  } catch (err) { toast('Could not read file', 'error'); }
 });
 
-$('saveSettings').onclick = async () => {
-  const body = Object.fromEntries(S_FIELDS.map(f => [f, $('s_' + f).value]));
-  body.llm_model = $('s_llm_model').value === '__custom__' ? $('s_llm_model_custom').value.trim() : $('s_llm_model').value;
+let aiTesting = false;
+function setAiSaveState(state, msg){
+  const btn = $('saveAi');
+  const status = $('aiSaveStatus');
+  if(state==='testing'){ aiTesting=true; btn.disabled=true; btn.textContent='Testing model…'; status.textContent=msg||'Testing…'; }
+  else if(state==='ok'){ aiTesting=false; btn.disabled=false; btn.textContent='Save AI provider'; status.textContent=''; }
+  else if(state==='error'){ aiTesting=false; btn.disabled=false; btn.textContent='Save AI provider'; status.textContent=msg||'Model check failed'; }
+}
+
+async function testAiModel(){
+  if(aiTesting) return;
+  setAiSaveState('testing','Testing model availability…');
+  try{
+    // First verify model is in list
+    const provider = $('s_llm_provider').value;
+    const base = $('s_llm_base_url').value.trim();
+    const models = await api('/settings/models?provider='+encodeURIComponent(provider)+'&base_url='+encodeURIComponent(base)+'&force=0');
+    const sel = modelSelectValue('s_llm_model','s_llm_model_custom');
+    const found = models.models.some(m=>m.id===sel);
+    if(!found && sel!==''){ setAiSaveState('error','Model not found in provider list'); return; }
+    // Then test connection
+    const r = await api('/settings/test-llm','POST');
+    if(r.ok){ setAiSaveState('ok'); } else { setAiSaveState('error','API key / model error'); }
+  }catch(e){ setAiSaveState('error',e.message); }
+}
+
+$('s_llm_model').onchange = ()=>{ setAiSaveState('testing'); testAiModel(); };
+$('s_llm_provider').onchange = ()=>{ savedModel=''; setAiSaveState('testing'); loadModels().then(()=>testAiModel()); };
+$('s_llm_base_url').addEventListener('change', ()=>{ setAiSaveState('testing'); loadModels().then(()=>testAiModel()); });
+
+$('saveAi').onclick = async () => {
+  if(aiTesting) return;
+  const body = {
+    llm_provider: $('s_llm_provider').value,
+    llm_base_url: $('s_llm_base_url').value.trim(),
+    llm_model: modelSelectValue('s_llm_model','s_llm_model_custom')
+  };
+  const apiKey = $('s_llm_api_key').value.trim();
+  if(apiKey) body.llm_api_key = apiKey;
+  try{
+    await api('/settings','PUT',body);
+    toast('AI provider saved','success');
+    setAiSaveState('ok');
+    loadSettings();
+  }catch(err){ toast(err.message,'error'); }
+};
+
+$('saveSheets').onclick = async () => {
   const email = $('s_sa_email').value.trim();
   const priv = $('s_sa_private_key').value.trim();
-  if (email && priv) {
-    const sa = {
-      type: 'service_account',
-      project_id: '',
-      private_key_id: '',
-      private_key: priv,
-      client_email: email,
-      client_id: '',
-      auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-      token_uri: 'https://oauth2.googleapis.com/token',
-      auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
-      client_x509_cert_url: ''
-    };
-    $('s_google_service_account_json').value = JSON.stringify(sa);
+  const body = {
+    master_sheet_id: $('s_master_sheet_id').value.trim(),
+    schedule_sheet_id: $('s_schedule_sheet_id').value.trim(),
+    sheet_sync_minutes: $('s_sheet_sync_minutes').value,
+    auto_start_new: $('s_auto_start_new').value
+  };
+  if(email && priv){
+    body.google_service_account_json = JSON.stringify({
+      type:'service_account', project_id:'', private_key_id:'', private_key:priv,
+      client_email:email, client_id:'', auth_uri:'https://accounts.google.com/o/oauth2/auth',
+      token_uri:'https://oauth2.googleapis.com/token',
+      auth_provider_x509_cert_url:'https://www.googleapis.com/oauth2/v1/certs',
+      client_x509_cert_url:''
+    });
+  }else if($('s_google_service_account_json').value.trim()){
+    body.google_service_account_json = $('s_google_service_account_json').value.trim();
   }
-  for (const f of ['llm_api_key', 'google_service_account_json']) if ($('s_' + f).value.trim()) body[f] = $('s_' + f).value.trim();
-  try { await api('/settings', 'PUT', body); toast('Settings saved'); loadSettings(); } catch (err) { toast(err.message); }
+  try{
+    await api('/settings','PUT',body);
+    toast('Google Sheets saved','success');
+    loadSettings();
+  }catch(err){ toast(err.message,'error'); }
+};
+
+$('testSheets').onclick = async () => {
+  $('sheetsSaveStatus').textContent='Testing…';
+  try{
+    const r = await api('/settings/test-sheets','POST');
+    $('sheetsSaveStatus').textContent = r.ok ? '✓ '+r.reply : '✗ '+r.error;
+  }catch(e){ $('sheetsSaveStatus').textContent='✗ '+e.message; }
+};
+
+$('saveN8n').onclick = async () => {
+  const body = {
+    n8n_webhook_url: $('s_n8n_webhook_url').value.trim(),
+    n8n_events: $('s_n8n_events').value
+  };
+  try{
+    await api('/settings','PUT',body);
+    toast('n8n saved','success');
+  }catch(err){ toast(err.message,'error'); }
+};
+
+$('testN8n').onclick = async () => {
+  $('n8nSaveStatus').textContent='Testing…';
+  try{
+    const r = await api('/settings/test-n8n','POST');
+    $('n8nSaveStatus').textContent = r.ok ? '✓ '+r.reply : '✗ '+r.error;
+  }catch(e){ $('n8nSaveStatus').textContent='✗ '+e.message; }
+};
+
+$('saveTelegram').onclick = async () => {
+  const body = {
+    telegram_bot_token: $('s_telegram_bot_token').value.trim(),
+    telegram_chat_id: $('s_telegram_chat_id').value.trim(),
+    telegram_api_url: $('s_telegram_api_url').value.trim()
+  };
+  try{
+    await api('/settings','PUT',body);
+    toast('Telegram saved','success');
+    loadSettings();
+  }catch(err){ toast(err.message,'error'); }
+};
+
+$('testTelegram').onclick = async () => {
+  $('tgSaveStatus').textContent='Testing…';
+  try{
+    // No dedicated test endpoint, reuse n8n test as placeholder
+    const r = await api('/settings/test-n8n','POST');
+    $('tgSaveStatus').textContent = 'Test sent';
+  }catch(e){ $('tgSaveStatus').textContent='✗ '+e.message; }
 };
 
 async function runTest(path) {
-  $('testResult').className = 'small muted'; $('testResult').textContent = 'Testing…';
-  const r = await api(path, 'POST');
-  $('testResult').className = 'small ' + (r.ok ? '' : 'err');
-  $('testResult').textContent = r.ok ? '✓ ' + r.reply : '✗ ' + r.error;
+  // kept for compatibility
 }
 
-$('testLlm').onclick = () => runTest('/settings/test-llm');
-$('testSheets').onclick = () => runTest('/settings/test-sheets');
-$('testN8n').onclick = () => runTest('/settings/test-n8n');
+// Scroll-based loading for usage table
+$('usageTableWrap').addEventListener('scroll', function() {
+  const scrollTop = this.scrollTop;
+  const scrollHeight = this.scrollHeight;
+  const clientHeight = this.clientHeight;
+
+  // Load more when scrolled near the bottom (within 50px)
+  if (scrollHeight - scrollTop - clientHeight < 50 && hasMoreUsage && !isLoadingUsage) {
+    loadUsage(true);
+  }
+});
+
+async function checkUpdate() {
+  $('updateStatus').textContent = 'Checking…';
+  try {
+    const v = await api('/version');
+    const cur = v.current_version || 'unknown';
+    const latest = v.latest_version || '';
+    const rel = v.latest_release || {};
+    $('updateInfo').innerHTML = `Current version: <b>${esc(cur)}</b>` +
+      (latest ? ` · Latest release: <b>${esc(latest)}</b> ${v.update_available ? '<span class="badge warn">Update available</span>' : '<span class="badge posted">Up to date</span>'}` : ' · No GitHub repo configured or network error');
+    if (rel.url) $('updateInfo').innerHTML += ` · <a href="${esc(rel.url)}" target="_blank">View release</a>`;
+    $('updateCard').classList.remove('hidden');
+    if (!v.update_available) {
+      $('updateNowBtn').disabled = true;
+      $('updateNowBtn').textContent = 'Up to date';
+    } else {
+      $('updateNowBtn').disabled = false;
+      $('updateNowBtn').textContent = 'Update now';
+    }
+  } catch (e) {
+    $('updateInfo').textContent = 'Could not check updates: ' + e.message;
+    $('updateCard').classList.remove('hidden');
+  } finally {
+    $('updateStatus').textContent = '';
+  }
+}
+
+$('checkUpdateBtn').onclick = checkUpdate;
+$('updateNowBtn').onclick = async () => {
+  if (!confirm('Update will restart containers and may cause brief downtime. Continue?')) return;
+  $('updateStatus').textContent = 'Updating…';
+  $('updateNowBtn').disabled = true;
+  try {
+    const r = await api('/update', 'POST');
+    if (r.ok) toast('Update started. Containers will restart shortly.', 'success');
+    else toast('Update failed: ' + (r.messages?.join('; ') || 'unknown error'), 'error');
+    setTimeout(checkUpdate, 5000);
+  } catch (e) {
+    toast('Update error: ' + e.message, 'error');
+    $('updateNowBtn').disabled = false;
+  } finally {
+    $('updateStatus').textContent = '';
+  }
+};
 
 boot(async () => {
   await loadSettings();
-  await loadUsage();
-  setInterval(loadUsage, 15000);
+  await checkUpdate();
+  usageOffset = 0;
+  hasMoreUsage = true;
+  await loadUsage(false);
+  setInterval(() => {
+    usageOffset = 0;
+    hasMoreUsage = true;
+    loadUsage(false);
+  }, 15000);
 });
 });
 </script>

@@ -942,7 +942,7 @@ need the session cookie or the header `Authorization: Bearer <API_TOKEN>`. Error
 | PATCH | `/api/accounts/{id}/posts/{post_id}` | any of `text`, `hashtags`, `image_url`, `video_url`, `scheduled_at`, `action` | Edit or act on a post. Actions: `approve` (publish at planned time), `post_now` (approve and publish now), `draft` (back to draft), `reject` (discard). Returns `status`, `scheduled_at`, `agent_running`. |
 | GET | `/api/drafts` | | Every draft waiting for approval, all accounts |
 | GET | `/api/accounts/{id}/research` | | Latest brief, its findings, last 20 cycles |
-| GET | `/api/events?account_id=&limit=` | | Activity log |
+| GET | `/api/events?account_id=&limit=&offset=&level=&agent=&q=` | | Activity log. Returns `{rows, total, levels, agents}`; `limit` ≤ 500, `q` searches messages |
 | GET | `/api/settings` | | Current settings (no secrets) |
 | PUT | `/api/settings` | setting fields | Save settings |
 | POST | `/api/settings/test-llm` | | Test the AI provider |

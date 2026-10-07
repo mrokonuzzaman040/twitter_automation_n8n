@@ -21,6 +21,36 @@
       "webhookId": "social-agents-events"
     },
     {
+      "id": "tgcfg1",
+      "name": "Get Telegram config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        120,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SOCIAL_AGENTS_URL }}/api/settings/telegram",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SOCIAL_AGENTS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
       "id": "n2",
       "name": "Build message",
       "type": "n8n-nodes-base.set",
@@ -81,7 +111,7 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ $env.TELEGRAM_BOT_TOKEN && $env.TELEGRAM_CHAT_ID ? 'yes' : 'no' }}",
+              "leftValue": "={{ $('Get Telegram config').item.json.bot_token && $('Get Telegram config').item.json.chat_id ? 'yes' : 'no' }}",
               "rightValue": "yes",
               "operator": {
                 "type": "string",
@@ -114,7 +144,7 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ $json.event }}",
+              "leftValue": "={{ $('Build message').item.json.event }}",
               "rightValue": "drafts_ready",
               "operator": {
                 "type": "string",
@@ -137,7 +167,7 @@
         100
       ],
       "parameters": {
-        "jsCode": "// one Telegram message per draft\nconst out = [];\nfor (const item of $input.all()) {\n  for (const post of item.json.data.posts || []) out.push({ json: { account: item.json.account, post } });\n}\nreturn out;"
+        "jsCode": "// one Telegram message per draft - read the original event from Build message by name,\n// since this node's own input is Get Telegram config's response, not Build message's.\nconst out = [];\nfor (const post of $('Build message').item.json.data.posts || []) {\n  out.push({ json: { account: $('Build message').item.json.account, post } });\n}\nreturn out;"
       }
     },
     {
@@ -151,10 +181,10 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.TELEGRAM_API_URL || 'https://api.telegram.org' }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "url": "={{ $('Get Telegram config').item.json.api_url }}/bot{{ $('Get Telegram config').item.json.bot_token }}/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: '📝 Draft for @' + $json.account.handle + ' (' + $json.account.platform + ')\\n\\n' + $json.post.text + ($json.post.hashtags ? '\\n\\n' + $json.post.hashtags : '') + '\\n\\n🕒 Planned: ' + $json.post.scheduled_local + ($json.post.image_url ? '\\n🖼 ' + $json.post.image_url : ''), reply_markup: { inline_keyboard: [[{ text: '✅ Approve', callback_data: 'approve:' + $json.account.id + ':' + $json.post.id }, { text: '🚀 Approve + post now', callback_data: 'post_now:' + $json.account.id + ':' + $json.post.id }], [{ text: '📝 Keep as draft', callback_data: 'draft:' + $json.account.id + ':' + $json.post.id }]] } }) }}",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Get Telegram config').item.json.chat_id, text: '📝 Draft for @' + $json.account.handle + ' (' + $json.account.platform + ')\\n\\n' + $json.post.text + ($json.post.hashtags ? '\\n\\n' + $json.post.hashtags : '') + '\\n\\n🕒 Planned: ' + $json.post.scheduled_local + ($json.post.image_url ? '\\n🖼 ' + $json.post.image_url : ''), reply_markup: { inline_keyboard: [[{ text: '✅ Approve', callback_data: 'approve:' + $json.account.id + ':' + $json.post.id }, { text: '🚀 Approve + post now', callback_data: 'post_now:' + $json.account.id + ':' + $json.post.id }], [{ text: '📝 Keep as draft', callback_data: 'draft:' + $json.account.id + ':' + $json.post.id }]] } }) }}",
         "options": {
           "response": {
             "response": {
@@ -175,10 +205,10 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.TELEGRAM_API_URL || 'https://api.telegram.org' }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "url": "={{ $('Get Telegram config').item.json.api_url }}/bot{{ $('Get Telegram config').item.json.bot_token }}/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: $json.message }) }}",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Get Telegram config').item.json.chat_id, text: $('Build message').item.json.message }) }}",
         "options": {
           "response": {
             "response": {
@@ -216,7 +246,7 @@
       "main": [
         [
           {
-            "node": "Telegram set up?",
+            "node": "Get Telegram config",
             "type": "main",
             "index": 0
           }
@@ -264,6 +294,17 @@
         [
           {
             "node": "Telegram: draft with approve buttons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Telegram config": {
+      "main": [
+        [
+          {
+            "node": "Telegram set up?",
             "type": "main",
             "index": 0
           }

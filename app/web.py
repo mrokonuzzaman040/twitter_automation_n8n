@@ -5,12 +5,13 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import config, db, hooks, llm, sheets
+from . import config, db, hooks, llm, sheets, update
 
 config.require()
 STATIC = Path(__file__).parent / "static"
@@ -77,6 +78,11 @@ def logs():
 @app.get("/settings")
 def settings():
     return FileResponse(STATIC / "settings.html")
+
+
+@app.get("/add-account")
+def add_account():
+    return FileResponse(STATIC / "add-account.html")
 
 
 @app.post("/api/login")
@@ -175,6 +181,7 @@ def edit_account(account_id: int, body: dict = Body(...)):
         bad("Another account already uses that platform and handle")
     fields["schedule_sheet_id"] = str(body.get("schedule_sheet_id", a["schedule_sheet_id"]) or "").strip()
     fields["tone"] = str(body.get("tone", a["tone"]) or "").strip()
+    fields["llm_model"] = str(body.get("llm_model", a["llm_model"]) or "").strip()
     if not str(body.get("target_profiles", "x")).strip():
         fields["target_profiles"] = ""
     db.update_account(account_id, **fields)
@@ -286,19 +293,39 @@ def get_research(account_id: int):
 
 
 @api.get("/events")
-def events(account_id: int = 0, limit: int = 200):
-    limit = max(1, min(1000, limit))
+def events(account_id: int = 0, limit: int = 50, offset: int = 0,
+           level: str = "", agent: str = "", q: str = ""):
+    limit = max(1, min(500, limit))
+    offset = max(0, offset)
+    where, args = ["1=1"], []
+    if account_id:
+        where.append("e.account_id=?")
+        args.append(account_id)
+    if level:
+        where.append("e.level=?")
+        args.append(level)
+    if agent:
+        where.append("e.agent=?")
+        args.append(agent)
+    if q:
+        where.append(f"e.message {'ILIKE' if db.USE_PG else 'LIKE'} ?")
+        args.append(f"%{q}%")
+    cond = " AND ".join(where)
     with db.control() as c:
-        if account_id:
-            return db.rows(c, "SELECT * FROM events WHERE account_id=? ORDER BY id DESC LIMIT ?", account_id, limit)
-        return db.rows(c, "SELECT e.*, a.handle FROM events e LEFT JOIN accounts a ON a.id=e.account_id "
-                          "ORDER BY e.id DESC LIMIT ?", limit)
+        total = (db.one(c, f"SELECT COUNT(*) AS n FROM events e WHERE {cond}", *args) or {}).get("n", 0)
+        rows_ = db.rows(c, f"SELECT e.*, a.handle FROM events e LEFT JOIN accounts a ON a.id=e.account_id "
+                           f"WHERE {cond} ORDER BY e.id DESC LIMIT ? OFFSET ?", *args, limit, offset)
+        levels = [r["level"] for r in db.rows(c, "SELECT DISTINCT level FROM events ORDER BY level")]
+        agents = [r["agent"] for r in db.rows(c, "SELECT DISTINCT agent FROM events ORDER BY agent")]
+    return {"rows": rows_, "total": total, "levels": levels, "agents": agents}
 
 
 # ---------- settings ----------
 
 PLAIN_SETTINGS = ["llm_provider", "llm_base_url", "llm_model", "master_sheet_id", "schedule_sheet_id",
-                  "sheet_sync_minutes", "auto_start_new", "n8n_webhook_url", "n8n_events"]
+                  "sheet_sync_minutes", "auto_start_new", "n8n_webhook_url", "n8n_events",
+                  "telegram_chat_id", "telegram_api_url"]
+DEFAULT_TELEGRAM_API_URL = "https://api.telegram.org"
 
 
 @api.get("/settings")
@@ -311,10 +338,35 @@ def get_settings():
     out["n8n_events"] = out["n8n_events"] or "1"
     out["api_token_set"] = bool(config.API_TOKEN)
     out["llm_api_key_set"] = bool(db.get_setting("llm_api_key"))
+    out["telegram_bot_token_set"] = bool(db.get_setting("telegram_bot_token"))
     out["google_service_account_email"] = sheets.service_account_email()
     out["presets"] = llm.PRESETS
     out["effective"] = {k: v for k, v in llm.current_config().items() if k != "api_key"}
     return out
+
+
+@api.get("/settings/telegram")
+def get_telegram_config():
+    """For n8n (or any trusted caller with the API token) - the actual credentials, not just whether they're set."""
+    return {"bot_token": db.get_setting("telegram_bot_token"), "chat_id": db.get_setting("telegram_chat_id"),
+           "api_url": db.get_setting("telegram_api_url") or DEFAULT_TELEGRAM_API_URL}
+
+
+@api.post("/settings/test-telegram")
+def test_telegram():
+    token, chat_id = db.get_setting("telegram_bot_token"), db.get_setting("telegram_chat_id")
+    if not token or not chat_id:
+        return {"ok": False, "error": "Save a bot token and chat id first"}
+    api_url = db.get_setting("telegram_api_url") or DEFAULT_TELEGRAM_API_URL
+    try:
+        r = httpx.post(f"{api_url}/bot{token}/sendMessage", timeout=15,
+                       json={"chat_id": chat_id, "text": "✅ Test message from the Social Agents panel."})
+        body = r.json()
+    except httpx.HTTPError as e:
+        return {"ok": False, "error": f"Could not reach Telegram: {e}"}
+    if not body.get("ok"):
+        return {"ok": False, "error": body.get("description") or f"HTTP {r.status_code}"}
+    return {"ok": True, "reply": "Sent - check Telegram"}
 
 
 @api.get("/settings/models")
@@ -330,8 +382,8 @@ def get_models(provider: str = "", base_url: str = "", force: bool = False):
 
 
 @api.get("/settings/usage")
-def get_usage():
-    return db.llm_usage_summary()
+def get_usage(offset: int = 0, limit: int = 20):
+    return db.llm_usage_summary(recent_limit=limit, offset=offset)
 
 
 @api.put("/settings")
@@ -371,6 +423,31 @@ def test_sheets():
 def test_n8n():
     ok, detail = hooks.send("test", None, {"message": "Test event from the Social Agents panel"})
     return {"ok": ok, "reply": detail, "error": detail}
+
+
+@api.get("/n8n-status")
+def n8n_status():
+    """Check if n8n is accessible"""
+    import httpx
+    try:
+        # Try to reach n8n health endpoint
+        response = httpx.get("http://n8n:5678/healthz", timeout=5.0)
+        return {"online": True, "status": response.status_code}
+    except Exception as e:
+        return {"online": False, "error": str(e)}
+
+
+@api.get("/version")
+def version_info():
+    return update.check_update()
+
+
+@api.post("/update")
+def trigger_update():
+    if not config.GITHUB_REPO:
+        raise HTTPException(400, "GITHUB_REPO not set in .env")
+    res = update.perform_update()
+    return res
 
 
 app.include_router(api)

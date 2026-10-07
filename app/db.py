@@ -17,9 +17,9 @@ if USE_PG:
     import psycopg2
     from psycopg2.extras import RealDictCursor
 
-SECRET_SETTINGS = {"llm_api_key", "google_service_account_json"}
+SECRET_SETTINGS = {"llm_api_key", "google_service_account_json", "telegram_bot_token"}
 ACCOUNT_FIELDS = ["platform", "handle", "topic", "tone", "language", "post_times", "timezone",
-                  "cycle_hours", "schedule_sheet_id", "target_profiles"]
+                  "cycle_hours", "schedule_sheet_id", "target_profiles", "llm_model", "username", "password", "cookies", "proxy", "start_time"]
 PLATFORMS = ("twitter", "instagram")
 CREDENTIAL_FIELDS = {
     "twitter": ["api_key", "api_secret", "access_token", "access_token_secret"],
@@ -40,6 +40,12 @@ CREATE TABLE IF NOT EXISTS accounts (
     post_mode TEXT NOT NULL DEFAULT 'approval',
     schedule_sheet_id TEXT NOT NULL DEFAULT '',
     target_profiles TEXT NOT NULL DEFAULT '',
+    llm_model TEXT NOT NULL DEFAULT '',
+    username TEXT NOT NULL DEFAULT '',
+    password TEXT NOT NULL DEFAULT '',
+    cookies TEXT NOT NULL DEFAULT '',
+    proxy TEXT NOT NULL DEFAULT '',
+    start_time TEXT NOT NULL DEFAULT '09:00',
     source TEXT NOT NULL DEFAULT 'panel',
     desired_state TEXT NOT NULL DEFAULT 'stopped',
     agent_status TEXT NOT NULL DEFAULT 'stopped',
@@ -92,6 +98,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     post_mode TEXT NOT NULL DEFAULT 'approval',
     schedule_sheet_id TEXT NOT NULL DEFAULT '',
     target_profiles TEXT NOT NULL DEFAULT '',
+    llm_model TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT 'panel',
     desired_state TEXT NOT NULL DEFAULT 'stopped',
     agent_status TEXT NOT NULL DEFAULT 'stopped',
@@ -176,7 +183,8 @@ CREATE TABLE IF NOT EXISTS posts (
 """
 
 # Applied to databases created by an earlier version; "duplicate column" means already applied.
-CONTROL_MIGRATIONS = ["ALTER TABLE accounts ADD COLUMN target_profiles TEXT NOT NULL DEFAULT ''"]
+CONTROL_MIGRATIONS = ["ALTER TABLE accounts ADD COLUMN target_profiles TEXT NOT NULL DEFAULT ''",
+                      "ALTER TABLE accounts ADD COLUMN llm_model TEXT NOT NULL DEFAULT ''"]
 MAX_TARGETS = 15
 
 _initialised = set()
@@ -503,11 +511,11 @@ def broken_models(provider: str) -> set:
     return {r["model"] for r in latest if not r["ok"] and r["error_kind"] == "model"}
 
 
-def llm_usage_summary(recent_limit: int = 20) -> dict:
+def llm_usage_summary(recent_limit: int = 20, offset: int = 0) -> dict:
     """Today's call/token/latency totals plus the most recent calls, for the Settings page."""
     since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat(timespec="seconds")
     with control() as c:
-        recent = rows(c, "SELECT * FROM llm_calls ORDER BY id DESC LIMIT ?", recent_limit)
+        recent = rows(c, "SELECT * FROM llm_calls ORDER BY id DESC LIMIT ? OFFSET ?", recent_limit, offset)
         today = one(c, "SELECT COUNT(*) AS calls, COALESCE(SUM(total_tokens),0) AS tokens, "
                        "COALESCE(AVG(duration_ms),0) AS avg_ms, "
                        "COALESCE(SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END),0) AS errors "

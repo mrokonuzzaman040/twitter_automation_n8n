@@ -44,7 +44,7 @@ def generate(account, brief, count, ctl) -> list:
         "Return a JSON array: [{\"text\": \"post body without hashtags\", \"hashtags\": [\"#tag\"], "
         "\"media_query\": \"2-4 word visual search phrase for a matching image\", "
         "\"source_url\": \"url of the angle used, or empty\"}]",
-        temperature=0.8, max_tokens=4000)
+        temperature=0.8, max_tokens=4000, model=account["llm_model"])
     if isinstance(data, dict):
         data = data.get("posts") or next((v for v in data.values() if isinstance(v, list)), [])
     posts = []

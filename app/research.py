@@ -136,7 +136,7 @@ def run(account, ctl, run_id) -> dict:
         "\"url\": \"source url or empty\"}]}\n"
         "Give 8-12 angles, covering every category that has findings. Only use facts present in the findings. "
         "Angles from target_profiles must be inspired by what works for them, never a copy of their posts.",
-        temperature=0.4)
+        temperature=0.4, model=account["llm_model"])
     if not isinstance(brief, dict):
         brief = {"summary": "", "angles": brief if isinstance(brief, list) else []}
     brief.setdefault("summary", "")

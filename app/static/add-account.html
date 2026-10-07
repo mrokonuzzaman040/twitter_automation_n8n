@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Social Agents - Add Account</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<div id="login" class="card hidden">
+  <h2>Social Agents</h2>
+  <form id="loginForm">
+    <label>Admin password</label>
+    <input type="password" id="password" autofocus>
+    <div class="actions"><button class="primary">Sign in</button></div>
+    <div id="loginErr" class="err small"></div>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <button class="menu-toggle">☰</button>
+  <aside>
+    <button class="sidebar-toggle">◀</button>
+    <div class="brand">
+      <div class="logo">S</div>
+      <span>Social Agents</span>
+    </div>
+    <nav>
+      <a href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="label">Dashboard</span></a>
+      <a href="/approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg><span class="label">Approvals</span> <span id="pendingCount" class="badge hidden"></span></a>
+      <a href="/content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg><span class="label">Content</span></a>
+      <a href="/research"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="label">Research</span></a>
+      <a href="/logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><span class="label">Logs</span></a>
+      <a href="/settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg><span class="label">Settings</span></a>
+    </nav>
+    <div class="side-foot">
+      <span id="masterBadge" class="badge">…</span>
+      <button id="logout">Sign out</button>
+    </div>
+  </aside>
+
+  <div class="content">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Add Account</h1>
+        <p id="pageSub">Configure a new social media account for automated posting</p>
+      </div>
+    </div>
+    <main>
+<div class="card">
+  <h2>Account Details</h2>
+  <div class="grid">
+    <div><label>Platform</label><select id="a_platform"><option value="twitter">X / Twitter</option><option value="instagram">Instagram</option></select></div>
+    <div><label>Handle</label><input id="a_handle" placeholder="@username"></div>
+  </div>
+  <label>Topic</label><input id="a_topic" placeholder="e.g. AI tools for small businesses">
+  <div class="grid">
+    <div><label>Tone (optional)</label><input id="a_tone" placeholder="e.g. witty, expert"></div>
+    <div><label>Language</label><input id="a_language" value="English"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Authentication</h2>
+  <div class="small muted">Provide either username/password or cookies for platform access.</div>
+  <div class="grid">
+    <div><label>Username</label><input id="a_username" placeholder="your username"></div>
+    <div><label>Password</label><input id="a_password" type="password" placeholder="your password"></div>
+  </div>
+  <label>Cookies (JSON format, alternative to username/password)</label>
+  <textarea id="a_cookies" placeholder='[{"name": "session_id", "value": "..."}]' style="min-height:80px"></textarea>
+  <label>Proxy (optional)</label>
+  <input id="a_proxy" placeholder="http://user:pass@proxy.example.com:8080">
+</div>
+
+<div class="card">
+  <h2>Scheduling</h2>
+  <div>
+    <label>Post times</label>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input id="a_post_times" value="09:00,13:00,18:00" style="flex:1">
+      <select id="a_post_times_picker">
+        <option value="06:00">06:00</option>
+        <option value="07:00">07:00</option>
+        <option value="08:00">08:00</option>
+        <option value="09:00">09:00</option>
+        <option value="10:00">10:00</option>
+        <option value="11:00">11:00</option>
+        <option value="12:00">12:00</option>
+        <option value="13:00">13:00</option>
+        <option value="14:00">14:00</option>
+        <option value="15:00">15:00</option>
+        <option value="16:00">16:00</option>
+        <option value="17:00">17:00</option>
+        <option value="18:00">18:00</option>
+        <option value="19:00">19:00</option>
+        <option value="20:00">20:00</option>
+        <option value="21:00">21:00</option>
+        <option value="22:00">22:00</option>
+      </select>
+      <button type="button" id="a_post_times_add" class="btn">Add</button>
+    </div>
+    <div class="small muted">Pick a time and Add. Duplicates ignored.</div>
+  </div>
+  <div class="grid">
+    <div><label>Timezone</label><input id="a_timezone" value="UTC" placeholder="Asia/Dhaka"></div>
+    <div><label>Daily start time</label><input id="a_start_time" type="time" value="09:00"></div>
+    <div><label>Research + create every (hours)</label><input id="a_cycle_hours" type="number" min="1" max="168" value="24"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Target Profiles</h2>
+  <div class="small muted">Upload a file with target profiles or enter them manually (one per line or comma separated).</div>
+  <label>Upload file (CSV, JSON, or Excel)</label>
+  <input type="file" id="a_target_profiles_file" accept=".csv,.json,.xlsx,.xls">
+  <label>Or enter manually</label>
+  <textarea id="a_target_profiles" style="min-height:100px" placeholder="@competitor1&#10;https://x.com/competitor2&#10;instagram:brandname"></textarea>
+</div>
+
+<div class="card">
+  <h2>Google Sheets Integration</h2>
+  <div class="small muted">Optional: Override the schedule sheet from Settings with a custom one for this account.</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <label style="margin:0">Own schedule sheet (URL or ID)</label>
+    <button type="button" id="scheduleSheetInfo" class="btn" style="padding:4px 8px;font-size:16px">ℹ️</button>
+  </div>
+  <input id="a_schedule_sheet_id" placeholder="https://docs.google.com/spreadsheets/d/...">
+  <div id="scheduleSheetTooltip" class="info-tooltip" style="display:none">
+    A custom Google Sheet that overrides the default schedule sheet from Settings. This allows you to have different schedules for different accounts. Leave blank to use the global schedule sheet.
+  </div>
+</div>
+
+<div id="accountErr" class="err small"></div>
+<div class="actions">
+  <button data-close onclick="window.location.href='/'">Cancel</button>
+  <button class="primary" id="saveAccount">Save Account</button>
+</div>
+    </main>
+  </div>
+</div>
+
+<div id="toastStack" class="toast-stack"></div>
+
+<script src="/static/common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+const A_FIELDS = ['platform', 'handle', 'topic', 'tone', 'language', 'post_times', 'timezone', 'cycle_hours', 'schedule_sheet_id', 'target_profiles', 'username', 'password', 'cookies', 'proxy', 'start_time'];
+
+$('a_post_times_add').onclick = () => {
+  const input = $('a_post_times');
+  const picker = $('a_post_times_picker');
+  const val = picker.value;
+  if (!val) return;
+  let times = input.value.split(',').map(s=>s.trim()).filter(Boolean);
+  if (!times.includes(val)) {
+    times.push(val);
+    times.sort((a,b)=>a.localeCompare(b));
+    input.value = times.join(',');
+  }
+};
+
+$('scheduleSheetInfo').onclick = () => {
+  const tooltip = $('scheduleSheetTooltip');
+  tooltip.style.display = tooltip.style.display === 'none' ? 'block' : 'none';
+};
+
+$('a_target_profiles_file').addEventListener('change', async e => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    $('a_target_profiles').value = text;
+    toast('File loaded successfully', 'success');
+  } catch (err) {
+    toast('Could not read file', 'error');
+  }
+});
+
+$('saveAccount').onclick = async () => {
+  const body = Object.fromEntries(A_FIELDS.map(f => [f, $('a_' + f).value]));
+  $('accountErr').textContent = '';
+
+  try {
+    // First, check if this account would be added to Google Sheet
+    const confirmMsg = `Are you sure you want to add this account?\n\nPlatform: ${body.platform}\nHandle: @${body.handle}\n\nThis account will be added to the system. Please ensure you've verified it can be stored in your Google Sheet configuration.`;
+    if (!confirm(confirmMsg)) return;
+
+    // Create the account
+    const result = await api('/accounts', 'POST', body);
+    toast('Account created successfully', 'success');
+    
+    // Redirect to dashboard
+    setTimeout(() => window.location.href = '/', 1000);
+  } catch (err) {
+    $('accountErr').textContent = err.message;
+  }
+};
+
+boot();
+});
+</script>
+</body>
+</html>

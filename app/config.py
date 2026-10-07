@@ -11,6 +11,7 @@ API_TOKEN = os.environ.get("API_TOKEN", "")
 LLM_CONCURRENCY = int(os.environ.get("LLM_CONCURRENCY", "3"))
 GRAPH_API_VERSION = os.environ.get("GRAPH_API_VERSION", "v23.0")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "")
 
 
 def require():
